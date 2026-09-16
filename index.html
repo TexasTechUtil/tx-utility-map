@@ -287,7 +287,7 @@ map.on('load', () => {
     roadPanelBody.textContent = message || 'Click any road to highlight it';
   }
 
-  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines', 'construction-points', 'wildfire-fill', 'hotspot-points', 'hotspot-clusters', 'smoke-fill', 'wind-points', 'gauge-points'];
+  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines', 'construction-points', 'construction-clusters', 'wildfire-fill', 'hotspot-points', 'hotspot-clusters', 'smoke-fill', 'wind-points', 'gauge-points'];
   map.on('click', (e) => {
     const existing = NON_ROAD_LAYERS.filter(id => map.getLayer(id));
     if (existing.length && map.queryRenderedFeatures(e.point, { layers: existing }).length) return;
@@ -665,25 +665,52 @@ async function loadDallasConstruction() {
   return features;
 }
 
+// Indigo, distinct from the amber/orange used everywhere else (outages, hotspots, wind) —
+// Dallas alone contributes 6,000+ points, and sharing the outage color made it look like
+// outage data was blanketing Dallas when clicked through and diagnosed.
+const CONSTRUCTION_COLOR = '#4f46e5';
+
 function initConstruction() {
-  map.addSource('construction', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  // Austin's data is LineString geometry; Dallas's is Point. A single clustered source
+  // can't mix geometry types (supercluster only clusters points), so they're separate.
+  map.addSource('construction-lines-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({
-    id: 'construction-lines', type: 'line', source: 'construction',
-    paint: { 'line-color': '#f97316', 'line-width': 4, 'line-opacity': 0.85 },
+    id: 'construction-lines', type: 'line', source: 'construction-lines-src',
+    paint: { 'line-color': CONSTRUCTION_COLOR, 'line-width': 4, 'line-opacity': 0.85 },
     layout: { 'line-cap': 'round' }
   });
+
+  map.addSource('construction-points-src', {
+    type: 'geojson', data: { type: 'FeatureCollection', features: [] },
+    cluster: true, clusterMaxZoom: 12, clusterRadius: 45
+  });
   map.addLayer({
-    id: 'construction-points', type: 'circle', source: 'construction',
-    filter: ['==', ['geometry-type'], 'Point'],
+    id: 'construction-clusters', type: 'circle', source: 'construction-points-src',
+    filter: ['has', 'point_count'],
     paint: {
-      'circle-radius': 5, 'circle-color': '#f97316', 'circle-opacity': 0.85,
+      'circle-color': CONSTRUCTION_COLOR, 'circle-opacity': 0.75,
+      'circle-radius': ['step', ['get', 'point_count'], 12, 10, 18, 100, 24, 1000, 32],
+      'circle-stroke-width': 1, 'circle-stroke-color': '#fff'
+    }
+  });
+  map.addLayer({
+    id: 'construction-cluster-count', type: 'symbol', source: 'construction-points-src',
+    filter: ['has', 'point_count'],
+    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 11 },
+    paint: { 'text-color': '#fff' }
+  });
+  map.addLayer({
+    id: 'construction-points', type: 'circle', source: 'construction-points-src',
+    filter: ['!', ['has', 'point_count']],
+    paint: {
+      'circle-radius': 4, 'circle-color': CONSTRUCTION_COLOR, 'circle-opacity': 0.8,
       'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff'
     }
   });
 
-  const constructionLayers = ['construction-lines', 'construction-points'];
+  const constructionLayers = ['construction-lines', 'construction-clusters', 'construction-cluster-count', 'construction-points'];
   let popup = null;
-  constructionLayers.forEach(layerId => {
+  ['construction-lines', 'construction-points'].forEach(layerId => {
     map.on('click', layerId, (e) => {
       if (popup) popup.remove();
       popup = new maplibregl.Popup()
@@ -691,6 +718,11 @@ function initConstruction() {
         .setHTML(e.features[0].properties.popupHtml)
         .addTo(map);
     });
+  });
+  map.on('click', 'construction-clusters', (e) => {
+    map.easeTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 13) });
+  });
+  constructionLayers.forEach(layerId => {
     map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
   });
@@ -705,8 +737,10 @@ function initConstruction() {
 
 async function refreshConstruction() {
   const [austin, dallas] = await Promise.all([loadAustinConstruction(), loadDallasConstruction()]);
-  const src = map.getSource('construction');
-  if (src) src.setData({ type: 'FeatureCollection', features: [...austin, ...dallas] });
+  const lineSrc = map.getSource('construction-lines-src');
+  if (lineSrc) lineSrc.setData({ type: 'FeatureCollection', features: austin });
+  const pointSrc = map.getSource('construction-points-src');
+  if (pointSrc) pointSrc.setData({ type: 'FeatureCollection', features: dallas });
 }
 
 // ---------- NWS weather alerts ----------
