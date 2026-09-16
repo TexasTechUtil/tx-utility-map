@@ -23,8 +23,8 @@
   "name": "Oncor (North/Central TX)",
   "website": "https://www.oncor.com/",
   "center": [
-   -97.4037,
-   31.8434
+   -97.3308,
+   32.7555
   ],
   "stormcenterId": "560abba3-7881-4741-b538-ca416b58ba1e",
   "viewId": "ca124b24-9a06-4b19-aeb3-1841a9c962e1",
@@ -36,8 +36,8 @@
   "name": "AEP Texas (Coastal/South TX)",
   "website": "https://www.aeptexas.com/",
   "center": [
-   -97.3671,
-   27.6417
+   -97.3964,
+   27.8006
   ],
   "stormcenterId": "3ff6812b-90d8-40cd-97a6-76633226f27b",
   "viewId": "6022fe09-5259-4763-892f-5f57463fa6a5",
@@ -49,8 +49,8 @@
   "name": "Texas-New Mexico Power",
   "website": "https://tnmp.com/",
   "center": [
-   -96.6672,
-   30.9752
+   -97.4023,
+   32.8503
   ],
   "stormcenterId": "6f00c909-0ab9-46c1-94c5-c07435d5baf6",
   "viewId": "5bb75bf1-56fa-4d46-ac74-dd9b2106611a",
@@ -62,8 +62,8 @@
   "name": "CPS Energy (San Antonio)",
   "website": "https://www.cpsenergy.com/",
   "center": [
-   -98.4281,
-   29.5637
+   -98.5082,
+   29.4996
   ],
   "stormcenterId": "912c6202-c3f4-491c-a8c1-726157725e92",
   "viewId": "812092c0-153f-4a7f-8c58-e1af1cb740b7",
@@ -75,8 +75,8 @@
   "name": "Austin Energy",
   "website": "http://www.austinenergy.com",
   "center": [
-   -97.7471,
-   30.4866
+   -97.6867,
+   30.4995
   ],
   "stormcenterId": "dd9c446f-f6b8-43f9-8f80-83f5245c60a1",
   "viewId": "76446308-a901-4fa3-849c-3dd569933a51",
@@ -88,8 +88,8 @@
   "name": "Pedernales Electric Cooperative",
   "website": "http://www.pec.coop/",
   "center": [
-   -99.0254,
-   30.5711
+   -99.0631,
+   30.3387
   ],
   "stormcenterId": "bac8eaf4-d343-4760-9a76-9c7beb6456a0",
   "viewId": "a6e670a6-58f1-40e9-9e67-64f7ac846cef",
@@ -101,8 +101,8 @@
   "name": "Bandera Electric Coop",
   "website": "http://www.banderaelectric.com/",
   "center": [
-   -98.7907,
-   29.6373
+   -99.2291,
+   29.6176
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/bandera/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://bandera.outagemap.coop/"
@@ -113,8 +113,8 @@
   "name": "Bartlett Electric Coop",
   "website": "http://www.bartlettec.coop/",
   "center": [
-   -96.8929,
-   30.5636
+   -97.198,
+   30.7025
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/bartlettec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://bartlettec.outagemap.coop/"
@@ -125,8 +125,8 @@
   "name": "Big Country Electric Coop",
   "website": "http://www.bigcountry.coop/",
   "center": [
-   -100.3559,
-   32.7053
+   -100.3773,
+   32.8515
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/bigcountry/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://bigcountry.outagemap.coop/"
@@ -137,8 +137,8 @@
   "name": "Choctaw Electric Coop Inc",
   "website": "https://www.choctawelectric.com",
   "center": [
-   -94.9618,
-   33.7714
+   -94.5062,
+   33.6211
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/choctawelectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://choctawelectric.outagemap.coop/"
@@ -149,8 +149,8 @@
   "name": "Denton County Elec Coop",
   "website": "http://www.coserv.com/",
   "center": [
-   -96.9991,
-   33.7875
+   -97.0852,
+   33.279
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/coserv/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://coserv.outagemap.coop/"
@@ -161,8 +161,8 @@
   "name": "Central Texas Elec Coop",
   "website": "http://www.ctec.coop/",
   "center": [
-   -98.9406,
-   30.932
+   -99.1934,
+   30.5544
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/ctec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://ctec.outagemap.coop/"
@@ -173,8 +173,8 @@
   "name": "Concho Valley Elec Coop Inc",
   "website": "http://www.cvec.coop/",
   "center": [
-   -99.9207,
-   31.5913
+   -100.7136,
+   31.7064
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/cvec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://cvec.outagemap.coop/"
@@ -185,8 +185,8 @@
   "name": "Deaf Smith Electric Coop",
   "website": "http://www.dsec.org/",
   "center": [
-   -102.343,
-   35.0221
+   -102.5731,
+   34.9428
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/dsec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://dsec.outagemap.coop/"
@@ -197,8 +197,8 @@
   "name": "Fayette Electric Coop",
   "website": "http://www.fayette.coop/",
   "center": [
-   -96.461,
-   30.1338
+   -96.9014,
+   29.8067
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/fayette/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://fayette.outagemap.coop/"
@@ -209,8 +209,8 @@
   "name": "Grayson-Collin Elec Coop",
   "website": "http://www.grayson-collin.coop/",
   "center": [
-   -96.7506,
-   33.8099
+   -96.644,
+   33.5153
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/graysoncollin/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://graysoncollin.outagemap.coop/"
@@ -221,8 +221,8 @@
   "name": "Heart Of Texas Electric Coop",
   "website": "http://www.hotec.coop/",
   "center": [
-   -97.1635,
-   31.4433
+   -97.4497,
+   31.3681
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/hotec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://hotec.outagemap.coop/"
@@ -233,8 +233,8 @@
   "name": "Hamilton County Elec Coop",
   "website": "http://www.hamiltonelectric.coop/",
   "center": [
-   -98.4989,
-   31.0978
+   -98.4083,
+   31.3612
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/hamiltonelectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://hamiltonelectric.outagemap.coop/"
@@ -245,8 +245,8 @@
   "name": "Hilco Electric Cooperative",
   "website": "http://www.hilco.coop/",
   "center": [
-   -96.948,
-   32.2162
+   -97.0461,
+   32.1791
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/hilco/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://hilco.outagemap.coop/"
@@ -257,8 +257,8 @@
   "name": "Lamar County Elec Coop",
   "website": "http://www.lamarelectric.coop/",
   "center": [
-   -95.294,
-   33.5447
+   -95.5574,
+   33.6054
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/lamarelectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://lamarelectric.outagemap.coop/"
@@ -269,8 +269,8 @@
   "name": "Jackson Electric Coop",
   "website": "http://www.jecec.com/",
   "center": [
-   -96.2703,
-   28.71
+   -96.1485,
+   29.129
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/jecec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://jecec.outagemap.coop/"
@@ -281,8 +281,8 @@
   "name": "Lamb County Electric Coop",
   "website": "http://www.lcec.coop/",
   "center": [
-   -102.1084,
-   34.1714
+   -102.3787,
+   34.0033
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/lcec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://lcec.outagemap.coop/"
@@ -293,8 +293,8 @@
   "name": "Karnes Electric Coop Inc",
   "website": "http://www.karnesec.org/",
   "center": [
-   -98.1962,
-   29.2816
+   -98.398,
+   28.8206
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/karnesec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://karnesec.outagemap.coop/"
@@ -305,8 +305,8 @@
   "name": "Kerrville Public Utility Board",
   "website": "http://www.kpub.com/",
   "center": [
-   -99.1671,
-   30.0486
+   -99.1597,
+   30.0555
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/kpub/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://kpub.outagemap.coop/"
@@ -317,8 +317,8 @@
   "name": "Medina Electric Coop",
   "website": "http://www.medinaec.org/",
   "center": [
-   -99.5235,
-   27.6682
+   -99.285,
+   28.4106
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/medinaec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://medinaec.outagemap.coop/"
@@ -329,8 +329,8 @@
   "name": "Nueces Electric Cooperative",
   "website": "http://www.nueceselectric.org/",
   "center": [
-   -97.3941,
-   27.4742
+   -98.1267,
+   27.651
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/nueceselectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://nueceselectric.outagemap.coop/"
@@ -341,8 +341,8 @@
   "name": "Rusk County Electric Coop",
   "website": "http://www.rcelectric.org/",
   "center": [
-   -94.4425,
-   31.6568
+   -94.4978,
+   31.953
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/rcelectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://rcelectric.outagemap.coop/"
@@ -353,8 +353,8 @@
   "name": "Red River Valley Rrl Elec",
   "website": "https://www.rrvrea.com",
   "center": [
-   -97.1456,
-   33.8646
+   -97.3623,
+   33.8486
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/rrvrea/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://rrvrea.outagemap.coop/"
@@ -365,8 +365,8 @@
   "name": "Rita Blanca Electric Coop",
   "website": "http://www.ritablancaelectric.com/",
   "center": [
-   -102.2997,
-   35.7414
+   -102.1357,
+   35.8862
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/ritablancaelectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://ritablancaelectric.outagemap.coop/"
@@ -377,8 +377,8 @@
   "name": "Sam Houston Electric Coop Inc",
   "website": "http://www.samhouston.net/",
   "center": [
-   -94.745,
-   30.8037
+   -94.8232,
+   30.6488
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/samhouston/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://samhouston.outagemap.coop/"
@@ -389,8 +389,8 @@
   "name": "San Patricio Electric Coop Inc",
   "website": "http://www.sanpatricioelectric.org/",
   "center": [
-   -97.1869,
-   27.9383
+   -97.8164,
+   28.2122
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/sanpatricioelectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://sanpatricioelectric.outagemap.coop/"
@@ -401,8 +401,8 @@
   "name": "Upshur Rural Elec Coop Corp",
   "website": "http://www.urecc.com/",
   "center": [
-   -94.7219,
-   32.9206
+   -94.7842,
+   32.6341
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/urecc/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://urecc.outagemap.coop/"
@@ -413,8 +413,8 @@
   "name": "Taylor Electric Coop Inc",
   "website": "http://www.taylorelectric.com/",
   "center": [
-   -99.5263,
-   31.6332
+   -99.8946,
+   32.2722
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/taylorelectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://taylorelectric.outagemap.coop/"
@@ -425,8 +425,8 @@
   "name": "Wood County Electric Coop",
   "website": "http://www.wcec.org/",
   "center": [
-   -95.2301,
-   33.1346
+   -95.3749,
+   32.7937
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/wcec/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://wcec.outagemap.coop/"
@@ -437,8 +437,8 @@
   "name": "Victoria Electric Coop",
   "website": "http://www.victoriaelectric.coop/",
   "center": [
-   -96.7891,
-   28.4379
+   -97.0565,
+   28.7512
   ],
   "summaryUrl": "https://outagemap-data.cloud.coop/victoriaelectric/Hosted_Outage_Map/summary.json",
   "mapUrl": "https://victoriaelectric.outagemap.coop/"
