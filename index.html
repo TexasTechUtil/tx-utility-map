@@ -29,6 +29,7 @@
   }
   #refreshBtn:hover { background: #f3f4f6; }
   #weatherToggleRow { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; }
+  .grp-label { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: .03em; }
 
   #goToRow { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; display: flex; gap: 5px; position: relative; }
   #goToRow input {
@@ -112,6 +113,27 @@
   <div class="legend-row">
     <input type="checkbox" id="tempToggle" checked>
     <label for="tempToggle">Show city temperatures</label>
+  </div>
+  <div class="grp-label">Outage risk factors</div>
+  <div class="legend-row">
+    <input type="checkbox" id="wildfireToggle" checked>
+    <label for="wildfireToggle">Wildfire perimeters</label>
+  </div>
+  <div class="legend-row">
+    <input type="checkbox" id="hotspotToggle" checked>
+    <label for="hotspotToggle">Satellite hotspots (24h)</label>
+  </div>
+  <div class="legend-row">
+    <input type="checkbox" id="smokeToggle">
+    <label for="smokeToggle">Smoke forecast</label>
+  </div>
+  <div class="legend-row">
+    <input type="checkbox" id="windToggle" checked>
+    <label for="windToggle">Wind gusts</label>
+  </div>
+  <div class="legend-row">
+    <input type="checkbox" id="gaugeToggle">
+    <label for="gaugeToggle">River/stream gauges</label>
   </div>
   <div id="updated">Loading&hellip;</div>
   <button id="refreshBtn">Refresh now</button>
@@ -265,7 +287,7 @@ map.on('load', () => {
     roadPanelBody.textContent = message || 'Click any road to highlight it';
   }
 
-  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines', 'construction-points'];
+  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines', 'construction-points', 'wildfire-fill', 'hotspot-points', 'hotspot-clusters', 'smoke-fill', 'wind-points', 'gauge-points'];
   map.on('click', (e) => {
     const existing = NON_ROAD_LAYERS.filter(id => map.getLayer(id));
     if (existing.length && map.queryRenderedFeatures(e.point, { layers: existing }).length) return;
@@ -471,6 +493,7 @@ function initOutages() {
   initElPasoOutline();
   initConstruction();
   initTempLabels();
+  initRiskLayers();
 
   fetch('utilities.json').then(r => r.json()).then(list => {
     UTILITIES = list;
@@ -516,6 +539,7 @@ async function refresh() {
   refreshWeatherAlerts();
   refreshConstruction();
   refreshTempLabels();
+  refreshRiskLayers();
 }
 
 // ---------- Per-city current temperature ----------
@@ -758,6 +782,296 @@ async function refreshWeatherAlerts() {
     const src = map.getSource('weather-alerts');
     if (src) src.setData({ type: 'FeatureCollection', features });
   } catch (e) { console.error('Failed to load weather alerts', e); }
+}
+
+// ---------- Outage risk factors ----------
+// All from Esri's public Living Atlas disaster-response services (services9.arcgis.com),
+// the same data backing official emergency-management apps — free, no key, no token.
+const TX_BBOX = '-106.7,25.8,-93.4,36.6';
+const LIVING_ATLAS = 'https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services';
+
+function initRiskLayers() {
+  initWildfires();
+  initHotspots();
+  initSmoke();
+  initWind();
+  initGauges();
+}
+
+function refreshRiskLayers() {
+  refreshWildfires();
+  refreshHotspots();
+  refreshSmoke();
+  refreshWind();
+  refreshGauges();
+}
+
+// -- Wildfire perimeters --
+function initWildfires() {
+  map.addSource('wildfires', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'wildfire-fill', type: 'fill', source: 'wildfires',
+    paint: { 'fill-color': '#dc2626', 'fill-opacity': 0.25 }
+  });
+  map.addLayer({
+    id: 'wildfire-outline', type: 'line', source: 'wildfires',
+    paint: { 'line-color': '#991b1b', 'line-width': 2 }
+  });
+  let popup = null;
+  map.on('click', 'wildfire-fill', (e) => {
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup().setLngLat(e.lngLat).setHTML(e.features[0].properties.popupHtml).addTo(map);
+  });
+  map.on('mouseenter', 'wildfire-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'wildfire-fill', () => { map.getCanvas().style.cursor = ''; });
+  document.getElementById('wildfireToggle').addEventListener('change', (e) => {
+    const vis = e.target.checked ? 'visible' : 'none';
+    map.setLayoutProperty('wildfire-fill', 'visibility', vis);
+    map.setLayoutProperty('wildfire-outline', 'visibility', vis);
+  });
+  refreshWildfires();
+}
+
+async function refreshWildfires() {
+  try {
+    const url = `${LIVING_ATLAS}/USA_Wildfires_v1/FeatureServer/1/query?geometry=${TX_BBOX}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=IncidentName,GISAcres,IncidentTypeCategory,DateCurrent&f=geojson`;
+    const data = await fetch(url).then(r => r.json());
+    const features = (data.features || []).map(f => {
+      const p = f.properties;
+      const popupHtml =
+        `<b>${p.IncidentName || 'Wildfire'}</b><br>` +
+        `${fmt(Math.round(p.GISAcres || 0))} acres${p.IncidentTypeCategory ? ' &middot; ' + p.IncidentTypeCategory : ''}<br>` +
+        `<span style="color:#666;font-size:11px">${p.DateCurrent ? 'Updated ' + new Date(p.DateCurrent).toLocaleDateString() : ''}</span>`;
+      return { type: 'Feature', geometry: f.geometry, properties: { popupHtml } };
+    });
+    const src = map.getSource('wildfires');
+    if (src) src.setData({ type: 'FeatureCollection', features });
+  } catch (e) { console.error('Failed to load wildfires', e); }
+}
+
+// -- Satellite thermal hotspots (VIIRS) --
+// Includes non-wildfire heat sources (oil/gas flares, agricultural burns) — that's a
+// real limitation of satellite thermal detection, not a bug; the popup and legend say so.
+function initHotspots() {
+  map.addSource('hotspots', {
+    type: 'geojson', data: { type: 'FeatureCollection', features: [] },
+    cluster: true, clusterMaxZoom: 11, clusterRadius: 40
+  });
+  map.addLayer({
+    id: 'hotspot-clusters', type: 'circle', source: 'hotspots',
+    filter: ['has', 'point_count'],
+    paint: {
+      'circle-color': '#ea580c', 'circle-opacity': 0.75,
+      'circle-radius': ['step', ['get', 'point_count'], 12, 10, 18, 30, 24],
+      'circle-stroke-width': 1, 'circle-stroke-color': '#fff'
+    }
+  });
+  map.addLayer({
+    id: 'hotspot-count', type: 'symbol', source: 'hotspots',
+    filter: ['has', 'point_count'],
+    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 11 },
+    paint: { 'text-color': '#fff' }
+  });
+  map.addLayer({
+    id: 'hotspot-points', type: 'circle', source: 'hotspots',
+    filter: ['!', ['has', 'point_count']],
+    paint: {
+      'circle-radius': 4, 'circle-color': '#ea580c', 'circle-opacity': 0.8,
+      'circle-stroke-width': 1, 'circle-stroke-color': '#fff'
+    }
+  });
+  let popup = null;
+  map.on('click', 'hotspot-points', (e) => {
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup().setLngLat(e.features[0].geometry.coordinates).setHTML(e.features[0].properties.popupHtml).addTo(map);
+  });
+  map.on('click', 'hotspot-clusters', (e) => {
+    map.easeTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 12) });
+  });
+  ['hotspot-points', 'hotspot-clusters'].forEach(id => {
+    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  });
+  document.getElementById('hotspotToggle').addEventListener('change', (e) => {
+    const vis = e.target.checked ? 'visible' : 'none';
+    ['hotspot-clusters', 'hotspot-count', 'hotspot-points'].forEach(id => map.setLayoutProperty(id, 'visibility', vis));
+  });
+  refreshHotspots();
+}
+
+async function refreshHotspots() {
+  try {
+    const url = `${LIVING_ATLAS}/Satellite_VIIRS_Thermal_Hotspots_and_Fire_Activity/FeatureServer/0/query?geometry=${TX_BBOX}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=hours_old<=24&outFields=confidence,frp,acq_date,hours_old,satellite&f=geojson`;
+    const data = await fetch(url).then(r => r.json());
+    const features = (data.features || []).map(f => {
+      const p = f.properties;
+      const popupHtml =
+        `<b>Satellite thermal hotspot</b><br>` +
+        `Confidence: ${p.confidence || 'unknown'} &middot; ${p.hours_old != null ? p.hours_old.toFixed(1) + 'h ago' : ''}<br>` +
+        `Fire radiative power: ${p.frp != null ? p.frp + ' MW' : 'n/a'}<br>` +
+        `<span style="color:#666;font-size:11px">${p.satellite || ''} &middot; may be a flare or ag burn, not necessarily wildfire</span>`;
+      return { type: 'Feature', geometry: f.geometry, properties: { popupHtml } };
+    });
+    const src = map.getSource('hotspots');
+    if (src) src.setData({ type: 'FeatureCollection', features });
+  } catch (e) { console.error('Failed to load hotspots', e); }
+}
+
+// -- Smoke forecast --
+function initSmoke() {
+  map.addSource('smoke', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'smoke-fill', type: 'fill', source: 'smoke',
+    layout: { visibility: 'none' },
+    paint: { 'fill-color': '#78716c', 'fill-opacity': ['get', 'opacity'] }
+  });
+  let popup = null;
+  map.on('click', 'smoke-fill', (e) => {
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup().setLngLat(e.lngLat).setHTML(e.features[0].properties.popupHtml).addTo(map);
+  });
+  map.on('mouseenter', 'smoke-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'smoke-fill', () => { map.getCanvas().style.cursor = ''; });
+  document.getElementById('smokeToggle').addEventListener('change', (e) => {
+    map.setLayoutProperty('smoke-fill', 'visibility', e.target.checked ? 'visible' : 'none');
+  });
+  refreshSmoke();
+}
+
+async function refreshSmoke() {
+  try {
+    const url = `${LIVING_ATLAS}/NDGD_SmokeForecast_v1/FeatureServer/0/query?geometry=${TX_BBOX}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=smoke_classdesc&f=geojson`;
+    const data = await fetch(url).then(r => r.json());
+    const features = (data.features || []).map(f => {
+      const desc = f.properties.smoke_classdesc || '0 - 3';
+      const low = parseFloat(desc.split('-')[0]) || 0;
+      const opacity = Math.max(0.08, Math.min(0.5, low / 60));
+      return { type: 'Feature', geometry: f.geometry,
+        properties: { opacity, popupHtml: `<b>Smoke forecast</b><br>Density band: ${desc} &micro;g/m&sup3;` } };
+    });
+    const src = map.getSource('smoke');
+    if (src) src.setData({ type: 'FeatureCollection', features });
+  } catch (e) { console.error('Failed to load smoke forecast', e); }
+}
+
+// -- Wind gusts (NOAA METAR stations) --
+// Sustained/gust winds above ~45-50mph are a real leading indicator for tree-on-line and
+// pole failures — this is shown as a risk signal, independent of whether an outage has
+// been reported yet.
+let windMarkers = [];
+function windColor(mph) {
+  if (mph >= 50) return '#991b1b';
+  if (mph >= 35) return '#dc2626';
+  if (mph >= 25) return '#f97316';
+  return '#eab308';
+}
+
+function initWind() {
+  map.addSource('wind-stations', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'wind-points', type: 'circle', source: 'wind-stations',
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['get', 'mph'], 0, 3, 60, 9],
+      'circle-color': ['get', 'color'], 'circle-opacity': 0.75,
+      'circle-stroke-width': 1, 'circle-stroke-color': '#fff'
+    }
+  });
+  let popup = null;
+  map.on('click', 'wind-points', (e) => {
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup().setLngLat(e.features[0].geometry.coordinates).setHTML(e.features[0].properties.popupHtml).addTo(map);
+  });
+  map.on('mouseenter', 'wind-points', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'wind-points', () => { map.getCanvas().style.cursor = ''; });
+  document.getElementById('windToggle').addEventListener('change', (e) => {
+    const vis = e.target.checked ? 'visible' : 'none';
+    map.setLayoutProperty('wind-points', 'visibility', vis);
+    windMarkers.forEach(m => { m.getElement().style.display = e.target.checked ? '' : 'none'; });
+  });
+  refreshWind();
+}
+
+async function refreshWind() {
+  try {
+    const url = `${LIVING_ATLAS}/NOAA_METAR_current_wind_speed_direction_v1/FeatureServer/0/query?geometry=${TX_BBOX}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ICAO,STATION_NAME,WIND_SPEED,WIND_GUST,OBS_DATETIME&f=geojson`;
+    const data = await fetch(url).then(r => r.json());
+    const showing = document.getElementById('windToggle').checked;
+    const features = [];
+    windMarkers.forEach(m => m.remove());
+    windMarkers = [];
+
+    (data.features || []).forEach(f => {
+      const p = f.properties;
+      const speed = p.WIND_SPEED || 0;
+      const gust = p.WIND_GUST || 0;
+      const mph = Math.max(speed, gust);
+      const color = windColor(mph);
+      const popupHtml =
+        `<b>${p.STATION_NAME || p.ICAO}</b><br>` +
+        `Sustained ${Math.round(speed)} mph${gust > speed ? `, gusting ${Math.round(gust)} mph` : ''}<br>` +
+        `<span style="color:#666;font-size:11px">${p.OBS_DATETIME ? new Date(p.OBS_DATETIME).toLocaleString() : ''}</span>`;
+      features.push({ type: 'Feature', geometry: f.geometry, properties: { mph, color, popupHtml } });
+
+      if (mph >= 35) {
+        const el = document.createElement('div');
+        el.className = 'temp-badge';
+        el.textContent = `${Math.round(mph)}mph`;
+        el.style.background = color;
+        el.title = popupHtml.replace(/<[^>]+>/g, ' ');
+        if (!showing) el.style.display = 'none';
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat(f.geometry.coordinates).addTo(map);
+        windMarkers.push(marker);
+      }
+    });
+
+    const src = map.getSource('wind-stations');
+    if (src) src.setData({ type: 'FeatureCollection', features });
+  } catch (e) { console.error('Failed to load wind data', e); }
+}
+
+// -- River/stream gauges (USGS) --
+function initGauges() {
+  map.addSource('gauges', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'gauge-points', type: 'circle', source: 'gauges',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': 5, 'circle-color': '#0891b2', 'circle-opacity': 0.8,
+      'circle-stroke-width': 1, 'circle-stroke-color': '#fff'
+    }
+  });
+  let popup = null;
+  map.on('click', 'gauge-points', (e) => {
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup().setLngLat(e.features[0].geometry.coordinates).setHTML(e.features[0].properties.popupHtml).addTo(map);
+  });
+  map.on('mouseenter', 'gauge-points', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'gauge-points', () => { map.getCanvas().style.cursor = ''; });
+  document.getElementById('gaugeToggle').addEventListener('change', (e) => {
+    map.setLayoutProperty('gauge-points', 'visibility', e.target.checked ? 'visible' : 'none');
+  });
+  refreshGauges();
+}
+
+async function refreshGauges() {
+  try {
+    const url = 'https://waterservices.usgs.gov/nwis/iv/?stateCd=tx&parameterCd=00065&siteStatus=active&format=json&siteType=ST&period=P1D';
+    const data = await fetch(url).then(r => r.json());
+    const features = (data.value.timeSeries || []).map(ts => {
+      const loc = ts.sourceInfo.geoLocation.geogLocation;
+      const vals = ts.values[0].value;
+      const latest = vals.length ? vals[vals.length - 1] : null;
+      const popupHtml =
+        `<b>${ts.sourceInfo.siteName}</b><br>` +
+        `Gauge height: ${latest ? latest.value + ' ft' : 'no data'}<br>` +
+        `<span style="color:#666;font-size:11px">${latest ? new Date(latest.dateTime).toLocaleString() : ''}</span>`;
+      return { type: 'Feature', geometry: { type: 'Point', coordinates: [loc.longitude, loc.latitude] },
+        properties: { popupHtml } };
+    });
+    const src = map.getSource('gauges');
+    if (src) src.setData({ type: 'FeatureCollection', features });
+  } catch (e) { console.error('Failed to load river gauges', e); }
 }
 </script>
 </body>
