@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Texas Electric Utility Territories</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { height: 100%; margin: 0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  #map { height: 100%; }
+
+  #panel {
+    position: absolute; top: 12px; left: 12px; z-index: 1000;
+    background: rgba(255,255,255,0.95); padding: 10px 14px; border-radius: 8px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3); max-width: 260px; font-size: 13px;
+  }
+  #panel h1 { font-size: 15px; margin: 0 0 8px; }
+  #panel input[type="search"] {
+    width: 100%; box-sizing: border-box; padding: 5px 7px; margin-bottom: 8px;
+    border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
+  }
+  .legend-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; cursor: pointer; user-select: none; }
+  .legend-row.disabled { opacity: 0.35; }
+  .swatch { width: 14px; height: 14px; border-radius: 3px; flex: none; border: 1px solid rgba(0,0,0,0.2); }
+  #count { color: #666; font-size: 11px; margin-top: 6px; }
+  .leaflet-popup-content { font-size: 13px; }
+  .leaflet-popup-content b { font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h1>Texas Electric Utility Territories</h1>
+  <input type="search" id="search" placeholder="Search utility name...">
+  <div id="legend"></div>
+  <div id="count"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const COLORS = {
+  'INVESTOR OWNED':      '#3b82f6',
+  'MUNICIPAL':           '#ef4444',
+  'COOPERATIVE':         '#22c55e',
+  'POLITICAL SUBDIVISION': '#a855f7'
+};
+const DEFAULT_COLOR = '#94a3b8';
+const colorFor = t => COLORS[(t || '').toUpperCase()] || DEFAULT_COLOR;
+
+const map = L.map('map', { zoomControl: true }).setView([31.3, -99.3], 6);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Data: HIFLD / EIA',
+  maxZoom: 18
+}).addTo(map);
+
+const activeTypes = new Set(Object.keys(COLORS));
+activeTypes.add('OTHER');
+
+let geoLayer = null;
+let allFeaturesCount = 0;
+
+function styleFor(feature) {
+  return {
+    color: '#ffffff',
+    weight: 1,
+    fillOpacity: 0.55,
+    fillColor: colorFor(feature.properties.TYPE)
+  };
+}
+
+function typeKey(t) {
+  const u = (t || '').toUpperCase();
+  return COLORS[u] ? u : 'OTHER';
+}
+
+function passesFilter(feature, query) {
+  if (!activeTypes.has(typeKey(feature.properties.TYPE))) return false;
+  if (query) {
+    const name = (feature.properties.NAME || '').toLowerCase();
+    if (!name.includes(query)) return false;
+  }
+  return true;
+}
+
+fetch('tx_utilities.geojson')
+  .then(r => r.json())
+  .then(data => {
+    allFeaturesCount = data.features.length;
+    geoLayer = L.geoJSON(data, {
+      style: styleFor,
+      filter: f => passesFilter(f, ''),
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties;
+        const customers = p.CUSTOMERS ? Number(p.CUSTOMERS).toLocaleString() + ' customers' : '';
+        const site = p.WEBSITE ? `<br><a href="${p.WEBSITE}" target="_blank" rel="noopener">${p.WEBSITE}</a>` : '';
+        layer.bindPopup(
+          `<b>${p.NAME || 'Unknown'}</b><br>${p.TYPE || ''}${customers ? ' &middot; ' + customers : ''}${site}`
+        );
+        layer.on('mouseover', () => layer.setStyle({ weight: 3, fillOpacity: 0.75 }));
+        layer.on('mouseout', () => geoLayer.resetStyle(layer));
+      }
+    }).addTo(map);
+    map.fitBounds(geoLayer.getBounds());
+    updateCount();
+  })
+  .catch(err => {
+    document.getElementById('panel').innerHTML =
+      '<b>Failed to load data.</b><br>Make sure tx_utilities.geojson is next to index.html.';
+    console.error(err);
+  });
+
+function updateCount() {
+  let visible = 0;
+  geoLayer.eachLayer(() => visible++);
+  document.getElementById('count').textContent = `${visible} of ${allFeaturesCount} territories shown`;
+}
+
+// Rebuild the layer's visible features based on current filter + search
+function applyFilters() {
+  if (!geoLayer) return;
+  const query = document.getElementById('search').value.trim().toLowerCase();
+  geoLayer.eachLayer(layer => {
+    const show = passesFilter(layer.feature, query);
+    const el = layer.getElement ? layer.getElement() : null;
+    if (el) el.style.display = show ? '' : 'none';
+  });
+  let visible = 0;
+  geoLayer.eachLayer(layer => {
+    const el = layer.getElement ? layer.getElement() : null;
+    if (!el || el.style.display !== 'none') visible++;
+  });
+  document.getElementById('count').textContent = `${visible} of ${allFeaturesCount} territories shown`;
+}
+
+document.getElementById('search').addEventListener('input', applyFilters);
+
+// Build legend / type toggles
+const legendEl = document.getElementById('legend');
+const legendTypes = [...Object.keys(COLORS), 'OTHER'];
+legendTypes.forEach(t => {
+  const row = document.createElement('div');
+  row.className = 'legend-row';
+  row.dataset.type = t;
+  row.innerHTML = `<span class="swatch" style="background:${COLORS[t] || DEFAULT_COLOR}"></span><span>${t.charAt(0) + t.slice(1).toLowerCase()}</span>`;
+  row.addEventListener('click', () => {
+    if (activeTypes.has(t)) {
+      activeTypes.delete(t);
+      row.classList.add('disabled');
+    } else {
+      activeTypes.add(t);
+      row.classList.remove('disabled');
+    }
+    applyFilters();
+  });
+  legendEl.appendChild(row);
+});
+</script>
+</body>
+</html>
