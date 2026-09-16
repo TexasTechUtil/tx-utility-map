@@ -470,9 +470,10 @@ function initOutages() {
   });
   map.on('click', 'clusters', (e) => {
     // Not using getClusterExpansionZoom here: it depends on the GeoJSON source's
-    // web worker responding, which isn't reliable in every embedding context.
-    // A fixed zoom-in step is simpler and has no such dependency.
-    map.easeTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 14) });
+    // web worker responding, which isn't reliable in every embedding context. A fixed
+    // zoom-in step avoids that; jumpTo (not easeTo) so it doesn't depend on an animation
+    // frame completing either.
+    map.jumpTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 14) });
   });
   map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = ''; });
@@ -720,7 +721,7 @@ function initConstruction() {
     });
   });
   map.on('click', 'construction-clusters', (e) => {
-    map.easeTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 13) });
+    map.jumpTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 13) });
   });
   constructionLayers.forEach(layerId => {
     map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -920,7 +921,7 @@ function initHotspots() {
     popup = new maplibregl.Popup().setLngLat(e.features[0].geometry.coordinates).setHTML(e.features[0].properties.popupHtml).addTo(map);
   });
   map.on('click', 'hotspot-clusters', (e) => {
-    map.easeTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 12) });
+    map.jumpTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 12) });
   });
   ['hotspot-points', 'hotspot-clusters'].forEach(id => {
     map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
