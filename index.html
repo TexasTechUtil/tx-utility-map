@@ -28,6 +28,17 @@
     border: 1px solid #ccc; border-radius: 4px; background: #fff;
   }
   #refreshBtn:hover { background: #f3f4f6; }
+  #weatherToggleRow { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; }
+
+  #goToRow { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; display: flex; gap: 5px; position: relative; }
+  #goToRow input {
+    flex: 1; min-width: 0; padding: 5px 7px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;
+  }
+  #goToRow button {
+    padding: 5px 9px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: #fff;
+  }
+  #goToRow button:hover { background: #f3f4f6; }
+  #goToErr { color: #b91c1c; font-size: 11px; margin-top: 3px; }
 
   #roadPanel {
     position: absolute; top: 12px; right: 12px; z-index: 10;
@@ -83,8 +94,18 @@
   </div>
   <div class="legend-row"><span class="swatch" style="background:#ef4444"></span><span>Individual outages (with ETR)</span></div>
   <div class="legend-row"><span class="swatch" style="background:#f59e0b;border-radius:4px"></span><span>Other utilities &mdash; area totals</span></div>
+  <div class="legend-row"><span class="swatch" style="background:transparent;border:2px dashed #8b5cf6;border-radius:2px"></span><span>El Paso Electric &mdash; no live data, click area for their map</span></div>
+  <div id="weatherToggleRow" class="legend-row">
+    <input type="checkbox" id="weatherToggle" checked>
+    <label for="weatherToggle">Show NWS weather alerts</label>
+  </div>
   <div id="updated">Loading&hellip;</div>
   <button id="refreshBtn">Refresh now</button>
+  <div id="goToRow">
+    <input type="text" id="goToInput" placeholder="lat, lng (e.g. 30.27, -97.74)">
+    <button id="goToBtn">Go</button>
+  </div>
+  <div id="goToErr"></div>
 </div>
 
 <div id="roadPanel">
@@ -111,6 +132,29 @@ const map = new maplibregl.Map({
   maxBounds: [[-109.0, 24.0], [-91.0, 38.0]]
 });
 map.addControl(new maplibregl.NavigationControl(), 'bottom-left');
+
+// ---------- Go to lat/lng ----------
+let goToMarker = null;
+function goToLatLng() {
+  const errEl = document.getElementById('goToErr');
+  errEl.textContent = '';
+  const raw = document.getElementById('goToInput').value.trim();
+  const parts = raw.split(/[,\s]+/).map(Number);
+  if (parts.length !== 2 || parts.some(isNaN)) {
+    errEl.textContent = 'Enter as "lat, lng"';
+    return;
+  }
+  const [lat, lng] = parts;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    errEl.textContent = 'Out of range';
+    return;
+  }
+  map.flyTo({ center: [lng, lat], zoom: 12 });
+  if (goToMarker) goToMarker.remove();
+  goToMarker = new maplibregl.Marker({ color: '#2563eb' }).setLngLat([lng, lat]).addTo(map);
+}
+document.getElementById('goToBtn').addEventListener('click', goToLatLng);
+document.getElementById('goToInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') goToLatLng(); });
 
 // ---------- About panel ----------
 const aboutBtn = document.getElementById('aboutBtn');
@@ -192,9 +236,9 @@ map.on('load', () => {
     'source-layer': NAME_SOURCE_LAYER,
     filter: ['==', ['get', 'name'], ' __none__'],
     paint: {
-      'line-color': '#fbbf24',
+      'line-color': '#2563eb',
       'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3, 14, 9],
-      'line-opacity': 0.85
+      'line-opacity': 0.9
     },
     layout: { 'line-cap': 'round', 'line-join': 'round' }
   });
@@ -207,9 +251,10 @@ map.on('load', () => {
     roadPanelBody.textContent = message || 'Click any road to highlight it';
   }
 
+  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill'];
   map.on('click', (e) => {
-    const outageHit = map.queryRenderedFeatures(e.point, { layers: ['outage-circles'] });
-    if (outageHit.length) return;
+    const existing = NON_ROAD_LAYERS.filter(id => map.getLayer(id));
+    if (existing.length && map.queryRenderedFeatures(e.point, { layers: existing }).length) return;
 
     const match = nearestNamedRoad(e.point, 14);
     if (!match) { clearHighlight(); return; }
@@ -336,31 +381,74 @@ async function loadDataCapable(u) {
 
 let UTILITIES = [];
 
-function initOutages() {
-  map.addSource('outages', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({
-    id: 'outage-circles',
-    type: 'circle',
-    source: 'outages',
-    paint: {
-      'circle-radius': ['get', 'radius'],
-      'circle-color': ['get', 'color'],
-      'circle-opacity': 0.75,
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#ffffff'
-    }
-  });
-
+function bindPopup(layerId) {
   let popup = null;
-  map.on('click', 'outage-circles', (e) => {
+  map.on('click', layerId, (e) => {
     if (popup) popup.remove();
     popup = new maplibregl.Popup()
       .setLngLat(e.features[0].geometry.coordinates)
       .setHTML(e.features[0].properties.popupHtml)
       .addTo(map);
   });
-  map.on('mouseenter', 'outage-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'outage-circles', () => { map.getCanvas().style.cursor = ''; });
+  map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+}
+
+function initOutages() {
+  // Individual precise outages (DataCapable) get clustered — Houston alone can have
+  // 100+ overlapping points, unreadable at statewide zoom without it.
+  map.addSource('outage-points', {
+    type: 'geojson', data: { type: 'FeatureCollection', features: [] },
+    cluster: true, clusterMaxZoom: 13, clusterRadius: 45
+  });
+  map.addLayer({
+    id: 'clusters', type: 'circle', source: 'outage-points',
+    filter: ['has', 'point_count'],
+    paint: {
+      'circle-color': '#ef4444',
+      'circle-radius': ['step', ['get', 'point_count'], 14, 10, 19, 30, 25, 100, 32],
+      'circle-opacity': 0.8,
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#ffffff'
+    }
+  });
+  map.addLayer({
+    id: 'cluster-count', type: 'symbol', source: 'outage-points',
+    filter: ['has', 'point_count'],
+    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 12 },
+    paint: { 'text-color': '#ffffff' }
+  });
+  map.addLayer({
+    id: 'outage-points-unclustered', type: 'circle', source: 'outage-points',
+    filter: ['!', ['has', 'point_count']],
+    paint: {
+      'circle-radius': ['get', 'radius'], 'circle-color': ['get', 'color'],
+      'circle-opacity': 0.8, 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff'
+    }
+  });
+  map.on('click', 'clusters', (e) => {
+    // Not using getClusterExpansionZoom here: it depends on the GeoJSON source's
+    // web worker responding, which isn't reliable in every embedding context.
+    // A fixed zoom-in step is simpler and has no such dependency.
+    map.easeTo({ center: e.features[0].geometry.coordinates, zoom: Math.min(map.getZoom() + 2.5, 14) });
+  });
+  map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = ''; });
+  bindPopup('outage-points-unclustered');
+
+  // Utility-wide aggregate totals (Kubra / cloud.coop) — one point per utility, no clustering needed.
+  map.addSource('outage-aggregates', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'outage-aggregates', type: 'circle', source: 'outage-aggregates',
+    paint: {
+      'circle-radius': ['get', 'radius'], 'circle-color': ['get', 'color'],
+      'circle-opacity': 0.75, 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff'
+    }
+  });
+  bindPopup('outage-aggregates');
+
+  initWeatherAlerts();
+  initElPasoOutline();
 
   fetch('utilities.json').then(r => r.json()).then(list => {
     UTILITIES = list;
@@ -383,13 +471,16 @@ async function refresh() {
   const totalOutages = ok.reduce((s, r) => s + r.outages, 0);
   const totalCustA = ok.reduce((s, r) => s + r.custA, 0);
 
-  const features = [];
+  const pointFeatures = [];
+  const aggregateFeatures = [];
   ok.forEach(r => {
-    if (r.features) features.push(...r.features);
-    else if (r.feature) features.push(r.feature);
+    if (r.features) pointFeatures.push(...r.features);
+    else if (r.feature) aggregateFeatures.push(r.feature);
   });
-  const src = map.getSource('outages');
-  if (src) src.setData({ type: 'FeatureCollection', features });
+  const pointSrc = map.getSource('outage-points');
+  if (pointSrc) pointSrc.setData({ type: 'FeatureCollection', features: pointFeatures });
+  const aggSrc = map.getSource('outage-aggregates');
+  if (aggSrc) aggSrc.setData({ type: 'FeatureCollection', features: aggregateFeatures });
 
   document.getElementById('statOutages').textContent = fmt(totalOutages);
   document.getElementById('statCustomers').textContent = fmt(totalCustA);
@@ -399,6 +490,83 @@ async function refresh() {
     'Updated ' + new Date().toLocaleTimeString() +
     (failedCount ? ` (${failedCount} of ${results.length} sources unavailable)` : '') +
     ' · refreshes every 5 min';
+
+  refreshWeatherAlerts();
+}
+
+// ---------- NWS weather alerts ----------
+const SEVERITY_COLORS = { Extreme: '#7c3aed', Severe: '#dc2626', Moderate: '#f59e0b', Minor: '#3b82f6', Unknown: '#6b7280' };
+
+function initWeatherAlerts() {
+  map.addSource('weather-alerts', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'weather-fill', type: 'fill', source: 'weather-alerts',
+    paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.22 }
+  });
+  map.addLayer({
+    id: 'weather-outline', type: 'line', source: 'weather-alerts',
+    paint: { 'line-color': ['get', 'color'], 'line-width': 1.5, 'line-opacity': 0.8 }
+  });
+
+  let popup = null;
+  map.on('click', 'weather-fill', (e) => {
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup()
+      .setLngLat(e.lngLat)
+      .setHTML(e.features[0].properties.popupHtml)
+      .addTo(map);
+  });
+  map.on('mouseenter', 'weather-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'weather-fill', () => { map.getCanvas().style.cursor = ''; });
+
+  document.getElementById('weatherToggle').addEventListener('change', (e) => {
+    const vis = e.target.checked ? 'visible' : 'none';
+    map.setLayoutProperty('weather-fill', 'visibility', vis);
+    map.setLayoutProperty('weather-outline', 'visibility', vis);
+  });
+
+  refreshWeatherAlerts();
+}
+
+// ---------- El Paso Electric (reference outline only — no live data, see El Paso Electric note) ----------
+function initElPasoOutline() {
+  fetch('epelectric-territory.geojson').then(r => r.json()).then(data => {
+    map.addSource('epelectric', { type: 'geojson', data });
+    map.addLayer({
+      id: 'epelectric-fill', type: 'fill', source: 'epelectric',
+      paint: { 'fill-color': '#8b5cf6', 'fill-opacity': 0.08 }
+    });
+    map.addLayer({
+      id: 'epelectric-outline', type: 'line', source: 'epelectric',
+      paint: { 'line-color': '#8b5cf6', 'line-width': 2.5, 'line-dasharray': [2, 1.5] }
+    });
+    map.on('click', 'epelectric-fill', () => {
+      window.open('https://outagemap.epelectric.com/', '_blank', 'noopener');
+    });
+    map.on('mouseenter', 'epelectric-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'epelectric-fill', () => { map.getCanvas().style.cursor = ''; });
+  });
+}
+
+async function refreshWeatherAlerts() {
+  try {
+    const res = await fetch('https://api.weather.gov/alerts/active?area=TX');
+    const data = await res.json();
+    const features = (data.features || [])
+      .filter(f => f.geometry)
+      .map(f => {
+        const p = f.properties;
+        const color = SEVERITY_COLORS[p.severity] || SEVERITY_COLORS.Unknown;
+        const expires = p.expires ? new Date(p.expires).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'unknown';
+        const popupHtml =
+          `<b>${p.event}</b><br>${p.severity} severity<br>` +
+          `${(p.headline || '').replace(/"/g, '&quot;')}<br>` +
+          `<span style="color:#666;font-size:11px">Expires ${expires}</span>`;
+        return { type: 'Feature', geometry: f.geometry, properties: { color, popupHtml } };
+      });
+    const src = map.getSource('weather-alerts');
+    if (src) src.setData({ type: 'FeatureCollection', features });
+  } catch (e) { console.error('Failed to load weather alerts', e); }
 }
 </script>
 </body>
