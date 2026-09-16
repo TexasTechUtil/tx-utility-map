@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Texas Power Outages</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { height: 100%; margin: 0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  #map { height: 100%; }
+
+  #panel {
+    position: absolute; top: 12px; left: 12px; z-index: 1000;
+    background: rgba(255,255,255,0.95); padding: 10px 14px; border-radius: 8px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3); max-width: 280px; font-size: 13px;
+  }
+  #panel h1 { font-size: 15px; margin: 0 0 4px; }
+  #panel .sub { color: #666; font-size: 11px; margin-bottom: 8px; }
+  #panel .sub a { color: #2563eb; }
+  #stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  #stats .stat { background: #f3f4f6; border-radius: 6px; padding: 6px 8px; }
+  #stats .stat .n { font-size: 18px; font-weight: 700; line-height: 1.1; }
+  #stats .stat .l { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .02em; }
+  .legend-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,0.3); }
+  #updated { color: #666; font-size: 11px; margin-top: 8px; }
+  #refreshBtn {
+    margin-top: 6px; width: 100%; padding: 5px; font-size: 12px; cursor: pointer;
+    border: 1px solid #ccc; border-radius: 4px; background: #fff;
+  }
+  #refreshBtn:hover { background: #f3f4f6; }
+  .leaflet-popup-content { font-size: 13px; }
+  .leaflet-popup-content b { font-size: 14px; }
+  .err { color: #b91c1c; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h1>Texas Power Outages</h1>
+  <div class="sub">Live data from 6 utilities &middot; <a href="index.html">Utility territories map</a></div>
+  <div id="stats">
+    <div class="stat"><div class="n" id="statOutages">&mdash;</div><div class="l">Active outages</div></div>
+    <div class="stat"><div class="n" id="statCustomers">&mdash;</div><div class="l">Customers affected</div></div>
+  </div>
+  <div class="legend-row"><span class="swatch" style="background:#ef4444"></span><span>CenterPoint &mdash; individual outages</span></div>
+  <div class="legend-row"><span class="swatch" style="background:#f59e0b;border-radius:4px"></span><span>Other utilities &mdash; area totals</span></div>
+  <div id="updated">Loading&hellip;</div>
+  <button id="refreshBtn">Refresh now</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map', { zoomControl: true }).setView([31.3, -99.3], 6);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Outage data: utility public outage maps',
+  maxZoom: 18
+}).addTo(map);
+
+// Utilities whose outage viewer only exposes an area-wide summary (Kubra StormCenter).
+// Centroid is an approximate label point for their service territory, not an outage location.
+const KUBRA_UTILITIES = [
+  { key: 'oncor',       name: 'Oncor (North/Central TX)', center: [31.8434, -97.4037],
+    url: 'https://kubra.io/data/d3b96b98-db31-41b8-b594-0ff985a5b8d5/public/summary-1/data.json' },
+  { key: 'aep',         name: 'AEP Texas (Coastal/South TX)', center: [28.3237, -98.4807],
+    url: 'https://kubra.io/data/040bd3fc-89c8-4cd4-96c2-9b53afdda8f5/public/summary-1/data.json' },
+  { key: 'tnmp',        name: 'Texas-New Mexico Power', center: [30.9752, -96.6672],
+    url: 'https://kubra.io/data/bcd6e0c5-507c-4344-aa2c-91299ffe0a16/public/summary-1/data.json' },
+  { key: 'cps',         name: 'CPS Energy (San Antonio)', center: [29.5637, -98.4281],
+    url: 'https://kubra.io/data/4dc17c0b-8c4e-4b64-b8e3-5b318c174949/public/summary-2/data.json' },
+  { key: 'austin',      name: 'Austin Energy', center: [30.4866, -97.7471],
+    url: 'https://kubra.io/data/f39af9ef-9efc-440c-a743-d1c28ab874b6/public/summary-1/data.json' }
+];
+
+const CENTERPOINT_EVENTS_URL = 'https://centerpoint.datacapable.com/datacapable/v2/cache/p/centerpoint/r/texas/map/events';
+const CENTERPOINT_STATS_URL  = 'https://centerpoint.datacapable.com/datacapable/v2/p/centerpoint/r/texas/map/stats';
+
+let markerLayer = L.layerGroup().addTo(map);
+
+function severityColor(pct) {
+  if (pct >= 5) return '#b91c1c';
+  if (pct >= 1) return '#f59e0b';
+  return '#f59e0b';
+}
+
+function fmt(n) { return Number(n).toLocaleString(); }
+
+async function loadKubra(u) {
+  try {
+    const res = await fetch(u.url + '?_=' + Date.now());
+    const data = await res.json();
+    const t = data.summaryFileData.totals[0];
+    if (!t || t.total_outages === undefined) return null;
+    const outages = t.total_outages;
+    const custA = t.total_cust_a ? t.total_cust_a.val : 0;
+    const custS = t.total_cust_s || 0;
+    const pct = t.total_percent_cust_a ? t.total_percent_cust_a.val : 0;
+    const radius = Math.max(8, Math.min(40, 8 + Math.sqrt(outages) * 4));
+    const marker = L.circleMarker(u.center, {
+      radius, color: '#fff', weight: 1.5, fillOpacity: 0.75,
+      fillColor: severityColor(pct)
+    }).bindPopup(
+      `<b>${u.name}</b><br>${fmt(outages)} active outage${outages === 1 ? '' : 's'}<br>` +
+      `${fmt(custA)} customers affected (${pct}%)<br>` +
+      `${fmt(custS)} customers served<br>` +
+      `<span style="color:#666;font-size:11px">${new Date(data.summaryFileData.date_generated).toLocaleTimeString()}</span>`
+    );
+    marker.addTo(markerLayer);
+    return { outages, custA, custS };
+  } catch (e) {
+    console.error('Failed to load', u.name, e);
+    return null;
+  }
+}
+
+async function loadCenterPoint() {
+  try {
+    const [events, stats] = await Promise.all([
+      fetch(CENTERPOINT_EVENTS_URL + '?_=' + Date.now()).then(r => r.json()),
+      fetch(CENTERPOINT_STATS_URL + '?_=' + Date.now()).then(r => r.json())
+    ]);
+    let custA = 0;
+    events.forEach(ev => {
+      custA += ev.numPeople || 0;
+      const radius = Math.max(4, Math.min(22, 3 + Math.sqrt(ev.numPeople || 1)));
+      const city = (ev.additionalProperties || []).find(p => p.property === 'AREA_CITY');
+      const county = (ev.additionalProperties || []).find(p => p.property === 'AREA_COUNTY');
+      const marker = L.circleMarker([ev.latitude, ev.longitude], {
+        radius, color: '#fff', weight: 1, fillOpacity: 0.8, fillColor: '#ef4444'
+      }).bindPopup(
+        `<b>CenterPoint Energy</b><br>${fmt(ev.numPeople || 0)} customers affected<br>` +
+        `${ev.status || ''}${ev.cause ? ' &middot; ' + ev.cause : ''}<br>` +
+        `${city ? city.value[0] + ', ' : ''}${county ? county.value[0] + ' County' : ''}<br>` +
+        `<span style="color:#666;font-size:11px">Started ${new Date(ev.startTime).toLocaleString()}</span>`
+      );
+      marker.addTo(markerLayer);
+    });
+    return { outages: events.length, custA, custS: parseCustomersServed(stats.customers_served) };
+  } catch (e) {
+    console.error('Failed to load CenterPoint', e);
+    return null;
+  }
+}
+
+function parseCustomersServed(s) {
+  if (!s) return 0;
+  const m = String(s).match(/([\d.]+)\s*([MK]?)/i);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  const mult = { M: 1e6, K: 1e3, '': 1 }[m[2].toUpperCase()] || 1;
+  return Math.round(n * mult);
+}
+
+async function refresh() {
+  document.getElementById('updated').textContent = 'Refreshing…';
+  markerLayer.clearLayers();
+
+  const results = await Promise.all([
+    loadCenterPoint(),
+    ...KUBRA_UTILITIES.map(loadKubra)
+  ]);
+
+  const ok = results.filter(Boolean);
+  const totalOutages = ok.reduce((s, r) => s + r.outages, 0);
+  const totalCustA = ok.reduce((s, r) => s + r.custA, 0);
+
+  document.getElementById('statOutages').textContent = fmt(totalOutages);
+  document.getElementById('statCustomers').textContent = fmt(totalCustA);
+
+  const failedCount = results.length - ok.length;
+  document.getElementById('updated').textContent =
+    'Updated ' + new Date().toLocaleTimeString() +
+    (failedCount ? ` (${failedCount} source${failedCount === 1 ? '' : 's'} unavailable)` : '') +
+    ' · refreshes every 5 min';
+}
+
+document.getElementById('refreshBtn').addEventListener('click', refresh);
+refresh();
+setInterval(refresh, 5 * 60 * 1000);
+</script>
+</body>
+</html>
