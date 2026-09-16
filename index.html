@@ -81,6 +81,12 @@
 
   .maplibregl-popup-content { font-size: 13px; }
   .maplibregl-popup-content b { font-size: 14px; }
+
+  .temp-badge {
+    padding: 3px 7px; border-radius: 12px; font-size: 12px; font-weight: 700;
+    color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); white-space: nowrap;
+    border: 1.5px solid rgba(255,255,255,0.7); cursor: default;
+  }
 </style>
 </head>
 <body>
@@ -101,7 +107,11 @@
   </div>
   <div class="legend-row">
     <input type="checkbox" id="constructionToggle" checked>
-    <label for="constructionToggle">Show road construction (Austin only)</label>
+    <label for="constructionToggle">Show road construction (Austin, Dallas)</label>
+  </div>
+  <div class="legend-row">
+    <input type="checkbox" id="tempToggle" checked>
+    <label for="tempToggle">Show city temperatures</label>
   </div>
   <div id="updated">Loading&hellip;</div>
   <button id="refreshBtn">Refresh now</button>
@@ -255,7 +265,7 @@ map.on('load', () => {
     roadPanelBody.textContent = message || 'Click any road to highlight it';
   }
 
-  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines'];
+  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines', 'construction-points'];
   map.on('click', (e) => {
     const existing = NON_ROAD_LAYERS.filter(id => map.getLayer(id));
     if (existing.length && map.queryRenderedFeatures(e.point, { layers: existing }).length) return;
@@ -460,6 +470,7 @@ function initOutages() {
   initWeatherAlerts();
   initElPasoOutline();
   initConstruction();
+  initTempLabels();
 
   fetch('utilities.json').then(r => r.json()).then(list => {
     UTILITIES = list;
@@ -504,15 +515,131 @@ async function refresh() {
 
   refreshWeatherAlerts();
   refreshConstruction();
+  refreshTempLabels();
 }
 
-// ---------- Road construction (WZDx) ----------
-// Only Austin publishes an open, unrestricted feed. TxDOT's statewide feed exists but is
-// gated to emergency-management orgs by an approval process — not a fit for this map, so
-// it's not used. No other major TX city publishes one in the federal WZDx feed registry.
-const CONSTRUCTION_SOURCES = [
-  { key: 'austin', name: 'Austin', metaUrl: 'https://data.austintexas.gov/api/views/d9mm-cjw9.json' }
+// ---------- Per-city current temperature ----------
+const TEMP_CITIES = [
+  { name: 'Amarillo', station: 'KAMA', coord: [-101.7089, 35.2194] },
+  { name: 'Lubbock', station: 'KLBB', coord: [-101.8552, 33.5779] },
+  { name: 'Midland', station: 'KMAF', coord: [-102.2019, 31.9425] },
+  { name: 'Abilene', station: 'KABI', coord: [-99.6819, 32.4113] },
+  { name: 'El Paso', station: 'KELP', coord: [-106.4850, 31.7619] },
+  { name: 'Fort Worth', station: 'KFTW', coord: [-97.3627, 32.8198] },
+  { name: 'Dallas', station: 'KDAL', coord: [-96.7970, 32.8471] },
+  { name: 'Tyler', station: 'KTYR', coord: [-95.4022, 32.3541] },
+  { name: 'Waco', station: 'KACT', coord: [-97.2305, 31.6112] },
+  { name: 'Austin', station: 'KAUS', coord: [-97.6699, 30.1945] },
+  { name: 'San Antonio', station: 'KSAT', coord: [-98.4704, 29.5337] },
+  { name: 'Houston', station: 'KHOU', coord: [-95.2789, 29.6454] },
+  { name: 'Corpus Christi', station: 'KCRP', coord: [-97.5122, 27.7704] },
+  { name: 'Laredo', station: 'KLRD', coord: [-99.4614, 27.5438] },
+  { name: 'McAllen', station: 'KMFE', coord: [-98.2386, 26.1758] }
 ];
+let tempMarkers = [];
+
+function tempColor(f) {
+  if (f >= 100) return '#991b1b';
+  if (f >= 90) return '#dc2626';
+  if (f >= 80) return '#f97316';
+  if (f >= 70) return '#eab308';
+  if (f >= 60) return '#22c55e';
+  if (f >= 45) return '#3b82f6';
+  return '#6366f1';
+}
+
+function initTempLabels() {
+  document.getElementById('tempToggle').addEventListener('change', (e) => {
+    const display = e.target.checked ? '' : 'none';
+    tempMarkers.forEach(m => { m.getElement().style.display = display; });
+  });
+  refreshTempLabels();
+}
+
+async function refreshTempLabels() {
+  const results = await Promise.all(TEMP_CITIES.map(async city => {
+    try {
+      const res = await fetch(`https://api.weather.gov/stations/${city.station}/observations/latest`, { cache: 'no-store' });
+      const data = await res.json();
+      const c = data.properties.temperature.value;
+      if (c === null || c === undefined) return null;
+      return { city, f: Math.round(c * 9 / 5 + 32), obsTime: data.properties.timestamp };
+    } catch (e) { return null; }
+  }));
+
+  tempMarkers.forEach(m => m.remove());
+  tempMarkers = [];
+  const showing = document.getElementById('tempToggle').checked;
+
+  results.filter(Boolean).forEach(({ city, f, obsTime }) => {
+    const el = document.createElement('div');
+    el.className = 'temp-badge';
+    el.textContent = `${city.name} ${f}°`;
+    el.style.background = tempColor(f);
+    el.title = `Observed ${new Date(obsTime).toLocaleString()}`;
+    if (!showing) el.style.display = 'none';
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(city.coord).addTo(map);
+    tempMarkers.push(marker);
+  });
+}
+
+// ---------- Road construction ----------
+// Austin publishes an open WZDx feed. TxDOT's statewide feed exists but is gated to
+// emergency-management orgs by an approval process — not a fit for this map, so it's
+// not used. Dallas doesn't publish WZDx but exposes its Right-of-Way permit system (a
+// proxy for active construction/excavation work) via a public ArcGIS service. San
+// Antonio's equivalent service requires a login; Fort Worth had nothing usable.
+async function loadAustinConstruction() {
+  const features = [];
+  try {
+    // The underlying file id can change when Austin re-publishes, so resolve it fresh
+    // each refresh rather than hardcoding it (same lesson as the Kubra staleness fix).
+    const meta = await fetch('https://data.austintexas.gov/api/views/d9mm-cjw9.json?_=' + Date.now()).then(r => r.json());
+    const feed = await fetch(`https://data.austintexas.gov/api/views/${meta.id}/files/${meta.blobId}?_=${Date.now()}`).then(r => r.json());
+    const now = Date.now();
+    (feed.features || []).forEach(f => {
+      const p = f.properties;
+      const start = p.start_date ? new Date(p.start_date).getTime() : null;
+      const end = p.end_date ? new Date(p.end_date).getTime() : null;
+      if (start && start > now) return;
+      if (end && end < now) return;
+      const cd = p.core_details || {};
+      const roads = (cd.road_names || []).join(', ');
+      const popupHtml =
+        `<b>${cd.name || roads || 'Road construction'}</b><br>` +
+        `Austin${roads ? ' &middot; ' + roads : ''}${cd.direction ? ' (' + cd.direction + ')' : ''}<br>` +
+        `${p.vehicle_impact ? p.vehicle_impact.replace(/-/g, ' ') + '<br>' : ''}` +
+        `<span style="color:#666;font-size:11px">Through ${p.end_date ? new Date(p.end_date).toLocaleDateString() : 'unknown'}</span>`;
+      features.push({ type: 'Feature', geometry: f.geometry, properties: { popupHtml } });
+    });
+  } catch (e) { console.error('Failed to load Austin construction data', e); }
+  return features;
+}
+
+async function loadDallasConstruction() {
+  const features = [];
+  try {
+    const where = encodeURIComponent("ROWREQUESTEDSTARTDATE <= CURRENT_TIMESTAMP AND ROWESTIMATEDCOMPLETIONDATE >= CURRENT_TIMESTAMP AND STATUSDESCRIPTION = 'Issued'");
+    let offset = 0;
+    for (let page = 0; page < 4; page++) {
+      const url = `https://gis.dallascityhall.com/arcgis/rest/services/Pbw_public/ROWMSPermits/MapServer/0/query?where=${where}&outFields=*&f=geojson&resultRecordCount=2000&resultOffset=${offset}&_=${Date.now()}`;
+      const data = await fetch(url).then(r => r.json());
+      const feats = data.features || [];
+      feats.forEach(f => {
+        const p = f.properties;
+        const popupHtml =
+          `<b>${p.ROWIMPROVEMENTREPAIR || p.PERMITTYPE || 'Right-of-way work'}</b><br>` +
+          `Dallas &middot; ${p.LOCATIONNAMES || ''}<br>` +
+          `${(p.WORKDESCRIPTION || '').slice(0, 140)}<br>` +
+          `<span style="color:#666;font-size:11px">Through ${p.ROWESTIMATEDCOMPLETIONDATE ? new Date(p.ROWESTIMATEDCOMPLETIONDATE).toLocaleDateString() : 'unknown'}</span>`;
+        features.push({ type: 'Feature', geometry: f.geometry, properties: { popupHtml } });
+      });
+      if (feats.length < 2000) break;
+      offset += 2000;
+    }
+  } catch (e) { console.error('Failed to load Dallas construction data', e); }
+  return features;
+}
 
 function initConstruction() {
   map.addSource('construction', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -521,54 +648,41 @@ function initConstruction() {
     paint: { 'line-color': '#f97316', 'line-width': 4, 'line-opacity': 0.85 },
     layout: { 'line-cap': 'round' }
   });
-
-  let popup = null;
-  map.on('click', 'construction-lines', (e) => {
-    if (popup) popup.remove();
-    popup = new maplibregl.Popup()
-      .setLngLat(e.lngLat)
-      .setHTML(e.features[0].properties.popupHtml)
-      .addTo(map);
+  map.addLayer({
+    id: 'construction-points', type: 'circle', source: 'construction',
+    filter: ['==', ['geometry-type'], 'Point'],
+    paint: {
+      'circle-radius': 5, 'circle-color': '#f97316', 'circle-opacity': 0.85,
+      'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff'
+    }
   });
-  map.on('mouseenter', 'construction-lines', () => { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'construction-lines', () => { map.getCanvas().style.cursor = ''; });
+
+  const constructionLayers = ['construction-lines', 'construction-points'];
+  let popup = null;
+  constructionLayers.forEach(layerId => {
+    map.on('click', layerId, (e) => {
+      if (popup) popup.remove();
+      popup = new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(e.features[0].properties.popupHtml)
+        .addTo(map);
+    });
+    map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+  });
 
   document.getElementById('constructionToggle').addEventListener('change', (e) => {
-    map.setLayoutProperty('construction-lines', 'visibility', e.target.checked ? 'visible' : 'none');
+    const vis = e.target.checked ? 'visible' : 'none';
+    constructionLayers.forEach(id => map.setLayoutProperty(id, 'visibility', vis));
   });
 
   refreshConstruction();
 }
 
 async function refreshConstruction() {
-  const allFeatures = [];
-  for (const src of CONSTRUCTION_SOURCES) {
-    try {
-      // The underlying file id can change when the city re-publishes, so resolve it
-      // fresh each refresh rather than hardcoding it (same lesson as the Kubra fix).
-      const meta = await fetch(src.metaUrl + '?_=' + Date.now()).then(r => r.json());
-      const feedRes = await fetch(`https://data.austintexas.gov/api/views/${meta.id}/files/${meta.blobId}?_=${Date.now()}`);
-      const feed = await feedRes.json();
-      const now = Date.now();
-      (feed.features || []).forEach(f => {
-        const p = f.properties;
-        const start = p.start_date ? new Date(p.start_date).getTime() : null;
-        const end = p.end_date ? new Date(p.end_date).getTime() : null;
-        if (start && start > now) return; // not started yet
-        if (end && end < now) return; // already ended
-        const cd = p.core_details || {};
-        const roads = (cd.road_names || []).join(', ');
-        const popupHtml =
-          `<b>${cd.name || roads || 'Road construction'}</b><br>` +
-          `${src.name}${roads ? ' &middot; ' + roads : ''}${cd.direction ? ' (' + cd.direction + ')' : ''}<br>` +
-          `${p.vehicle_impact ? p.vehicle_impact.replace(/-/g, ' ') + '<br>' : ''}` +
-          `<span style="color:#666;font-size:11px">${p.end_date ? 'Through ' + new Date(p.end_date).toLocaleDateString() : ''}</span>`;
-        allFeatures.push({ type: 'Feature', geometry: f.geometry, properties: { popupHtml } });
-      });
-    } catch (e) { console.error('Failed to load construction data for', src.name, e); }
-  }
+  const [austin, dallas] = await Promise.all([loadAustinConstruction(), loadDallasConstruction()]);
   const src = map.getSource('construction');
-  if (src) src.setData({ type: 'FeatureCollection', features: allFeatures });
+  if (src) src.setData({ type: 'FeatureCollection', features: [...austin, ...dallas] });
 }
 
 // ---------- NWS weather alerts ----------
