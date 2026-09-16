@@ -1,0 +1,440 @@
+[
+ {
+  "kind": "datacapable",
+  "key": "centerpoint",
+  "name": "CenterPoint Energy",
+  "website": "https://www.centerpointenergy.com/",
+  "eventsUrl": "https://centerpoint.datacapable.com/datacapable/v2/cache/p/centerpoint/r/texas/map/events",
+  "statsUrl": "https://centerpoint.datacapable.com/datacapable/v2/p/centerpoint/r/texas/map/stats",
+  "mapUrl": "https://tracker.centerpointenergy.com/map/"
+ },
+ {
+  "kind": "datacapable",
+  "key": "entergytexas",
+  "name": "Entergy Texas",
+  "website": "http://www.entergy-texas.com/",
+  "eventsUrl": "https://entergy.datacapable.com/datacapable/v2/p/entergy/r/tx/map/events",
+  "statsUrl": "https://entergy.datacapable.com/datacapable/v2/p/entergy/r/tx/map/stats",
+  "mapUrl": "https://www.etrviewoutage.com/map?state=TX"
+ },
+ {
+  "kind": "kubra",
+  "key": "oncor",
+  "name": "Oncor (North/Central TX)",
+  "website": "https://www.oncor.com/",
+  "center": [
+   -97.4037,
+   31.8434
+  ],
+  "summaryUrl": "https://kubra.io/data/d3b96b98-db31-41b8-b594-0ff985a5b8d5/public/summary-1/data.json",
+  "mapUrl": "https://stormcenter.oncor.com/"
+ },
+ {
+  "kind": "kubra",
+  "key": "aep",
+  "name": "AEP Texas (Coastal/South TX)",
+  "website": "https://www.aeptexas.com/",
+  "center": [
+   -97.3671,
+   27.6417
+  ],
+  "summaryUrl": "https://kubra.io/data/040bd3fc-89c8-4cd4-96c2-9b53afdda8f5/public/summary-1/data.json",
+  "mapUrl": "https://outagemap.aeptexas.com/"
+ },
+ {
+  "kind": "kubra",
+  "key": "tnmp",
+  "name": "Texas-New Mexico Power",
+  "website": "https://tnmp.com/",
+  "center": [
+   -96.6672,
+   30.9752
+  ],
+  "summaryUrl": "https://kubra.io/data/bcd6e0c5-507c-4344-aa2c-91299ffe0a16/public/summary-1/data.json",
+  "mapUrl": "https://outagemap.tnmp.com/"
+ },
+ {
+  "kind": "kubra",
+  "key": "cps",
+  "name": "CPS Energy (San Antonio)",
+  "website": "https://www.cpsenergy.com/",
+  "center": [
+   -98.4281,
+   29.5637
+  ],
+  "summaryUrl": "https://kubra.io/data/4dc17c0b-8c4e-4b64-b8e3-5b318c174949/public/summary-2/data.json",
+  "mapUrl": "https://outagemap.cpsenergy.com/"
+ },
+ {
+  "kind": "kubra",
+  "key": "austin",
+  "name": "Austin Energy",
+  "website": "http://www.austinenergy.com",
+  "center": [
+   -97.7471,
+   30.4866
+  ],
+  "summaryUrl": "https://kubra.io/data/f39af9ef-9efc-440c-a743-d1c28ab874b6/public/summary-1/data.json",
+  "mapUrl": "https://outagemap.austinenergy.com/"
+ },
+ {
+  "kind": "kubra",
+  "key": "pec",
+  "name": "Pedernales Electric Cooperative",
+  "website": "http://www.pec.coop/",
+  "center": [
+   -99.0254,
+   30.5711
+  ],
+  "summaryUrl": "https://kubra.io/data/da187dff-a8a4-4377-81c0-6e9bfef1b394/public/summary-1/data.json",
+  "mapUrl": "https://map.mypec.com/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "bandera",
+  "name": "Bandera Electric Coop",
+  "website": "http://www.banderaelectric.com/",
+  "center": [
+   -98.7907,
+   29.6373
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/bandera/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://bandera.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "bartlettec",
+  "name": "Bartlett Electric Coop",
+  "website": "http://www.bartlettec.coop/",
+  "center": [
+   -96.8929,
+   30.5636
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/bartlettec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://bartlettec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "bigcountry",
+  "name": "Big Country Electric Coop",
+  "website": "http://www.bigcountry.coop/",
+  "center": [
+   -100.3559,
+   32.7053
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/bigcountry/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://bigcountry.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "choctawelectric",
+  "name": "Choctaw Electric Coop Inc",
+  "website": "https://www.choctawelectric.com",
+  "center": [
+   -94.9618,
+   33.7714
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/choctawelectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://choctawelectric.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "coserv",
+  "name": "Denton County Elec Coop",
+  "website": "http://www.coserv.com/",
+  "center": [
+   -96.9991,
+   33.7875
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/coserv/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://coserv.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "ctec",
+  "name": "Central Texas Elec Coop",
+  "website": "http://www.ctec.coop/",
+  "center": [
+   -98.9406,
+   30.932
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/ctec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://ctec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "cvec",
+  "name": "Concho Valley Elec Coop Inc",
+  "website": "http://www.cvec.coop/",
+  "center": [
+   -99.9207,
+   31.5913
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/cvec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://cvec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "dsec",
+  "name": "Deaf Smith Electric Coop",
+  "website": "http://www.dsec.org/",
+  "center": [
+   -102.343,
+   35.0221
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/dsec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://dsec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "fayette",
+  "name": "Fayette Electric Coop",
+  "website": "http://www.fayette.coop/",
+  "center": [
+   -96.461,
+   30.1338
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/fayette/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://fayette.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "graysoncollin",
+  "name": "Grayson-Collin Elec Coop",
+  "website": "http://www.grayson-collin.coop/",
+  "center": [
+   -96.7506,
+   33.8099
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/graysoncollin/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://graysoncollin.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "hotec",
+  "name": "Heart Of Texas Electric Coop",
+  "website": "http://www.hotec.coop/",
+  "center": [
+   -97.1635,
+   31.4433
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/hotec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://hotec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "hamiltonelectric",
+  "name": "Hamilton County Elec Coop",
+  "website": "http://www.hamiltonelectric.coop/",
+  "center": [
+   -98.4989,
+   31.0978
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/hamiltonelectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://hamiltonelectric.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "hilco",
+  "name": "Hilco Electric Cooperative",
+  "website": "http://www.hilco.coop/",
+  "center": [
+   -96.948,
+   32.2162
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/hilco/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://hilco.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "lamarelectric",
+  "name": "Lamar County Elec Coop",
+  "website": "http://www.lamarelectric.coop/",
+  "center": [
+   -95.294,
+   33.5447
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/lamarelectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://lamarelectric.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "jecec",
+  "name": "Jackson Electric Coop",
+  "website": "http://www.jecec.com/",
+  "center": [
+   -96.2703,
+   28.71
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/jecec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://jecec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "lcec",
+  "name": "Lamb County Electric Coop",
+  "website": "http://www.lcec.coop/",
+  "center": [
+   -102.1084,
+   34.1714
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/lcec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://lcec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "karnesec",
+  "name": "Karnes Electric Coop Inc",
+  "website": "http://www.karnesec.org/",
+  "center": [
+   -98.1962,
+   29.2816
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/karnesec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://karnesec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "kpub",
+  "name": "Kerrville Public Utility Board",
+  "website": "http://www.kpub.com/",
+  "center": [
+   -99.1671,
+   30.0486
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/kpub/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://kpub.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "medinaec",
+  "name": "Medina Electric Coop",
+  "website": "http://www.medinaec.org/",
+  "center": [
+   -99.5235,
+   27.6682
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/medinaec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://medinaec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "nueceselectric",
+  "name": "Nueces Electric Cooperative",
+  "website": "http://www.nueceselectric.org/",
+  "center": [
+   -97.3941,
+   27.4742
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/nueceselectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://nueceselectric.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "rcelectric",
+  "name": "Rusk County Electric Coop",
+  "website": "http://www.rcelectric.org/",
+  "center": [
+   -94.4425,
+   31.6568
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/rcelectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://rcelectric.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "rrvrea",
+  "name": "Red River Valley Rrl Elec",
+  "website": "https://www.rrvrea.com",
+  "center": [
+   -97.1456,
+   33.8646
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/rrvrea/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://rrvrea.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "ritablancaelectric",
+  "name": "Rita Blanca Electric Coop",
+  "website": "http://www.ritablancaelectric.com/",
+  "center": [
+   -102.2997,
+   35.7414
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/ritablancaelectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://ritablancaelectric.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "samhouston",
+  "name": "Sam Houston Electric Coop Inc",
+  "website": "http://www.samhouston.net/",
+  "center": [
+   -94.745,
+   30.8037
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/samhouston/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://samhouston.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "sanpatricioelectric",
+  "name": "San Patricio Electric Coop Inc",
+  "website": "http://www.sanpatricioelectric.org/",
+  "center": [
+   -97.1869,
+   27.9383
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/sanpatricioelectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://sanpatricioelectric.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "urecc",
+  "name": "Upshur Rural Elec Coop Corp",
+  "website": "http://www.urecc.com/",
+  "center": [
+   -94.7219,
+   32.9206
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/urecc/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://urecc.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "taylorelectric",
+  "name": "Taylor Electric Coop Inc",
+  "website": "http://www.taylorelectric.com/",
+  "center": [
+   -99.5263,
+   31.6332
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/taylorelectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://taylorelectric.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "wcec",
+  "name": "Wood County Electric Coop",
+  "website": "http://www.wcec.org/",
+  "center": [
+   -95.2301,
+   33.1346
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/wcec/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://wcec.outagemap.coop/"
+ },
+ {
+  "kind": "cloudcoop",
+  "key": "victoriaelectric",
+  "name": "Victoria Electric Coop",
+  "website": "http://www.victoriaelectric.coop/",
+  "center": [
+   -96.7891,
+   28.4379
+  ],
+  "summaryUrl": "https://outagemap-data.cloud.coop/victoriaelectric/Hosted_Outage_Map/summary.json",
+  "mapUrl": "https://victoriaelectric.outagemap.coop/"
+ }
+]
