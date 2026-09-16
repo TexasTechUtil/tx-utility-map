@@ -99,6 +99,10 @@
     <input type="checkbox" id="weatherToggle" checked>
     <label for="weatherToggle">Show NWS weather alerts</label>
   </div>
+  <div class="legend-row">
+    <input type="checkbox" id="constructionToggle" checked>
+    <label for="constructionToggle">Show road construction (Austin only)</label>
+  </div>
   <div id="updated">Loading&hellip;</div>
   <button id="refreshBtn">Refresh now</button>
   <div id="goToRow">
@@ -251,7 +255,7 @@ map.on('load', () => {
     roadPanelBody.textContent = message || 'Click any road to highlight it';
   }
 
-  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill'];
+  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines'];
   map.on('click', (e) => {
     const existing = NON_ROAD_LAYERS.filter(id => map.getLayer(id));
     if (existing.length && map.queryRenderedFeatures(e.point, { layers: existing }).length) return;
@@ -301,7 +305,13 @@ function fmtEtr(ms) {
 
 async function loadKubra(u) {
   try {
-    const res = await fetch(u.summaryUrl + '?_=' + Date.now());
+    // Kubra rotates the "data/{uuid}" path behind each stormcenter+view periodically —
+    // a summaryUrl hardcoded to one snapshot goes stale and silently serves old numbers.
+    // stormcenterId/viewId are stable, so resolve the current data path on every refresh.
+    const csRes = await fetch(`https://kubra.io/stormcenter/api/v1/stormcenters/${u.stormcenterId}/views/${u.viewId}/currentState?preview=false&_=${Date.now()}`);
+    const cs = await csRes.json();
+    const dataPath = cs.data.interval_generation_data;
+    const res = await fetch(`https://kubra.io/${dataPath}/public/summary-1/data.json?_=${Date.now()}`);
     const data = await res.json();
     const t = data.summaryFileData.totals[0];
     if (!t || t.total_outages === undefined) return null;
@@ -449,6 +459,7 @@ function initOutages() {
 
   initWeatherAlerts();
   initElPasoOutline();
+  initConstruction();
 
   fetch('utilities.json').then(r => r.json()).then(list => {
     UTILITIES = list;
@@ -492,6 +503,72 @@ async function refresh() {
     ' · refreshes every 5 min';
 
   refreshWeatherAlerts();
+  refreshConstruction();
+}
+
+// ---------- Road construction (WZDx) ----------
+// Only Austin publishes an open, unrestricted feed. TxDOT's statewide feed exists but is
+// gated to emergency-management orgs by an approval process — not a fit for this map, so
+// it's not used. No other major TX city publishes one in the federal WZDx feed registry.
+const CONSTRUCTION_SOURCES = [
+  { key: 'austin', name: 'Austin', metaUrl: 'https://data.austintexas.gov/api/views/d9mm-cjw9.json' }
+];
+
+function initConstruction() {
+  map.addSource('construction', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'construction-lines', type: 'line', source: 'construction',
+    paint: { 'line-color': '#f97316', 'line-width': 4, 'line-opacity': 0.85 },
+    layout: { 'line-cap': 'round' }
+  });
+
+  let popup = null;
+  map.on('click', 'construction-lines', (e) => {
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup()
+      .setLngLat(e.lngLat)
+      .setHTML(e.features[0].properties.popupHtml)
+      .addTo(map);
+  });
+  map.on('mouseenter', 'construction-lines', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'construction-lines', () => { map.getCanvas().style.cursor = ''; });
+
+  document.getElementById('constructionToggle').addEventListener('change', (e) => {
+    map.setLayoutProperty('construction-lines', 'visibility', e.target.checked ? 'visible' : 'none');
+  });
+
+  refreshConstruction();
+}
+
+async function refreshConstruction() {
+  const allFeatures = [];
+  for (const src of CONSTRUCTION_SOURCES) {
+    try {
+      // The underlying file id can change when the city re-publishes, so resolve it
+      // fresh each refresh rather than hardcoding it (same lesson as the Kubra fix).
+      const meta = await fetch(src.metaUrl + '?_=' + Date.now()).then(r => r.json());
+      const feedRes = await fetch(`https://data.austintexas.gov/api/views/${meta.id}/files/${meta.blobId}?_=${Date.now()}`);
+      const feed = await feedRes.json();
+      const now = Date.now();
+      (feed.features || []).forEach(f => {
+        const p = f.properties;
+        const start = p.start_date ? new Date(p.start_date).getTime() : null;
+        const end = p.end_date ? new Date(p.end_date).getTime() : null;
+        if (start && start > now) return; // not started yet
+        if (end && end < now) return; // already ended
+        const cd = p.core_details || {};
+        const roads = (cd.road_names || []).join(', ');
+        const popupHtml =
+          `<b>${cd.name || roads || 'Road construction'}</b><br>` +
+          `${src.name}${roads ? ' &middot; ' + roads : ''}${cd.direction ? ' (' + cd.direction + ')' : ''}<br>` +
+          `${p.vehicle_impact ? p.vehicle_impact.replace(/-/g, ' ') + '<br>' : ''}` +
+          `<span style="color:#666;font-size:11px">${p.end_date ? 'Through ' + new Date(p.end_date).toLocaleDateString() : ''}</span>`;
+        allFeatures.push({ type: 'Feature', geometry: f.geometry, properties: { popupHtml } });
+      });
+    } catch (e) { console.error('Failed to load construction data for', src.name, e); }
+  }
+  const src = map.getSource('construction');
+  if (src) src.setData({ type: 'FeatureCollection', features: allFeatures });
 }
 
 // ---------- NWS weather alerts ----------
