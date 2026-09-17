@@ -99,8 +99,8 @@
     <div class="stat"><div class="n" id="statOutages">&mdash;</div><div class="l">Active outages</div></div>
     <div class="stat"><div class="n" id="statCustomers">&mdash;</div><div class="l">Customers affected</div></div>
   </div>
-  <div class="legend-row"><span class="swatch" style="background:#ef4444"></span><span>Individual outages (with ETR)</span></div>
-  <div class="legend-row"><span class="swatch" style="background:#f59e0b;border-radius:4px"></span><span>Other utilities &mdash; area totals</span></div>
+  <div class="legend-row"><span class="swatch" style="background:#ef4444"></span><span>Individual outages (precise location)</span></div>
+  <div class="legend-row"><span class="swatch" style="background:#f59e0b;border-radius:4px"></span><span>Co-ops &mdash; area totals (no exact location published)</span></div>
   <div class="legend-row"><span class="swatch" style="background:transparent;border:2px dashed #8b5cf6;border-radius:2px"></span><span>El Paso Electric &mdash; no live data, click area for their map</span></div>
   <div id="weatherToggleRow" class="legend-row">
     <input type="checkbox" id="weatherToggle" checked>
@@ -199,8 +199,8 @@ aboutBtn.addEventListener('click', () => aboutPanel.classList.toggle('open'));
 
 function renderAboutPanel(utilities) {
   const groups = [
-    { label: 'Individual outages + restoration time', kinds: ['datacapable'] },
-    { label: 'Area-total outage counts', kinds: ['kubra', 'cloudcoop'] }
+    { label: 'Individual outages + restoration time', kinds: ['datacapable', 'kubra'] },
+    { label: 'Area-total outage counts only', kinds: ['cloudcoop'] }
   ];
   const list = document.getElementById('aboutList');
   list.innerHTML = '';
@@ -287,7 +287,7 @@ map.on('load', () => {
     roadPanelBody.textContent = message || 'Click any road to highlight it';
   }
 
-  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines', 'construction-points', 'construction-clusters', 'wildfire-fill', 'hotspot-points', 'hotspot-clusters', 'smoke-fill', 'wind-points', 'gauge-points'];
+  const NON_ROAD_LAYERS = ['clusters', 'outage-points-unclustered', 'outage-aggregates', 'weather-fill', 'epelectric-fill', 'construction-lines', 'construction-points', 'construction-clusters', 'wildfire-fill', 'hotspot-points', 'hotspot-clusters', 'smoke-fill', 'wind-points', 'gauge-points', 'kubra-detail-points'];
   map.on('click', (e) => {
     const existing = NON_ROAD_LAYERS.filter(id => map.getLayer(id));
     if (existing.length && map.queryRenderedFeatures(e.point, { layers: existing }).length) return;
@@ -335,6 +335,10 @@ function fmtEtr(ms) {
   return when;
 }
 
+// Cache of {regionId, dataId} per Kubra utility, refreshed each cycle from currentState.
+// Used by the detailed per-outage tile fetcher below — see initKubraDetail().
+const kubraTileConfig = {};
+
 async function loadKubra(u) {
   try {
     // Kubra rotates the "data/{uuid}" path behind each stormcenter+view periodically —
@@ -343,25 +347,22 @@ async function loadKubra(u) {
     const csRes = await fetch(`https://kubra.io/stormcenter/api/v1/stormcenters/${u.stormcenterId}/views/${u.viewId}/currentState?preview=false&_=${Date.now()}`);
     const cs = await csRes.json();
     const dataPath = cs.data.interval_generation_data;
+
+    // cluster_interval_generation_data looks like "cluster-data/{qkh}/{regionId}/{dataId}" —
+    // stash regionId/dataId so the tile fetcher doesn't need its own currentState round trip.
+    const clusterTemplate = cs.data.cluster_interval_generation_data || '';
+    const parts = clusterTemplate.split('/');
+    if (parts.length >= 4) kubraTileConfig[u.key] = { regionId: parts[2], dataId: parts[3] };
+
     const res = await fetch(`https://kubra.io/${dataPath}/public/summary-1/data.json?_=${Date.now()}`);
     const data = await res.json();
     const t = data.summaryFileData.totals[0];
     if (!t || t.total_outages === undefined) return null;
     const outages = t.total_outages;
     const custA = t.total_cust_a ? t.total_cust_a.val : 0;
-    const custS = t.total_cust_s || 0;
-    const pct = t.total_percent_cust_a ? t.total_percent_cust_a.val : 0;
-    const radius = Math.max(7, Math.min(38, 7 + Math.sqrt(outages) * 3.5));
-    const popupHtml =
-      `<b>${u.name}</b><br>${fmt(outages)} active outage${outages === 1 ? '' : 's'}<br>` +
-      `${fmt(custA)} customers affected (${pct}%)<br>` +
-      `${fmt(custS)} customers served<br>` +
-      `<span style="color:#666;font-size:11px">Restoration time not published at this level &middot; ${new Date(data.summaryFileData.date_generated).toLocaleTimeString()}</span>`;
-    return {
-      outages, custA,
-      feature: { type: 'Feature', geometry: { type: 'Point', coordinates: u.center },
-        properties: { radius, color: severityColor(pct), popupHtml } }
-    };
+    // No feature here — precise per-outage points for this utility come from
+    // refreshKubraDetail() instead, sourced from the same tile data Oncor's own map uses.
+    return { outages, custA };
   } catch (e) { console.error('Failed to load', u.name, e); return null; }
 }
 
@@ -422,6 +423,132 @@ async function loadDataCapable(u) {
 }
 
 let UTILITIES = [];
+
+// ---------- Kubra per-outage detail tiles ----------
+// Oncor's own site (and the 5 other Kubra utilities) don't expose individual outage
+// locations through the summary API we use for stats — they use a separate tile pyramid
+// (quadkey-addressed, same scheme Bing Maps uses) that the map widget fetches as you pan
+// and zoom. Reverse-engineered from stormcenter.oncor.com's own network requests:
+//   - stable per-utility: a "cluster level" (Oncor=3, the other 5 utilities=1) that
+//     doesn't change with zoom — it's a property of how Kubra pre-clustered that dataset.
+//   - rotates like the summary path: regionId/dataId from currentState's
+//     cluster_interval_generation_data, cached in kubraTileConfig by loadKubra() above.
+//   - tile content: each point's lat/lng is Google-encoded-polyline (precision 1e5) for a
+//     single coordinate; n_out/cust_a give cluster size, cluster:false means a single outage.
+function lonLatToTileXY(lon, lat, depth) {
+  const latRad = lat * Math.PI / 180;
+  const n = Math.pow(2, depth);
+  const x = Math.floor((lon + 180) / 360 * n);
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+  return [Math.max(0, Math.min(n - 1, x)), Math.max(0, Math.min(n - 1, y))];
+}
+function tileXYToQuadKey(x, y, depth) {
+  let qk = '';
+  for (let i = depth; i > 0; i--) {
+    let digit = 0;
+    const mask = 1 << (i - 1);
+    if ((x & mask) !== 0) digit += 1;
+    if ((y & mask) !== 0) digit += 2;
+    qk += digit;
+  }
+  return qk;
+}
+function quadKeysForBounds(bounds, depth) {
+  const [minX, minY] = lonLatToTileXY(bounds.getWest(), bounds.getNorth(), depth);
+  const [maxX, maxY] = lonLatToTileXY(bounds.getEast(), bounds.getSouth(), depth);
+  const keys = [];
+  for (let x = minX; x <= maxX; x++) {
+    for (let y = minY; y <= maxY; y++) keys.push(tileXYToQuadKey(x, y, depth));
+  }
+  return keys;
+}
+function decodeKubraPoint(encoded, precision = 1e5) {
+  let index = 0, lat = 0, lng = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    let shift = 0, result = 0, byte;
+    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+    const delta = (result & 1) ? ~(result >> 1) : (result >> 1);
+    if (pass === 0) lat += delta; else lng += delta;
+  }
+  return [lng / precision, lat / precision];
+}
+function kubraTileUrl(qk, level, regionId, dataId) {
+  const prefix = qk.slice(-3).split('').reverse().join('');
+  return `https://kubra.io/cluster-data/${prefix}/${regionId}/${dataId}/public/cluster-${level}/${qk}.json`;
+}
+
+const KUBRA_DETAIL_UTILITY_KEYS = ['oncor', 'aep', 'tnmp', 'cps', 'austin', 'pec'];
+let kubraDetailInFlight = false;
+
+async function refreshKubraDetail() {
+  if (kubraDetailInFlight || !UTILITIES.length) return;
+  kubraDetailInFlight = true;
+  try {
+    const zoom = map.getZoom();
+    const depth = Math.max(5, Math.min(12, Math.round(zoom)));
+    const bounds = map.getBounds();
+    const quadKeys = quadKeysForBounds(bounds, depth);
+    if (quadKeys.length > 60) return; // sanity cap; shouldn't happen since depth tracks zoom
+
+    const utilByKey = Object.fromEntries(UTILITIES.map(u => [u.key, u]));
+    const features = [];
+
+    await Promise.all(KUBRA_DETAIL_UTILITY_KEYS.map(async key => {
+      const u = utilByKey[key];
+      const cfg = kubraTileConfig[key];
+      if (!u || !cfg) return;
+      const level = u.clusterLevel || 1;
+      await Promise.all(quadKeys.map(async qk => {
+        try {
+          const res = await fetch(kubraTileUrl(qk, level, cfg.regionId, cfg.dataId));
+          if (!res.ok) return;
+          const tile = await res.json();
+          (tile.file_data || []).forEach(f => {
+            if (!f.geom || !f.geom.p || !f.geom.p[0]) return;
+            const coord = decodeKubraPoint(f.geom.p[0]);
+            const d = f.desc || {};
+            const nOut = d.n_out || 1;
+            const custA = d.cust_a ? d.cust_a.val : 0;
+            const radius = Math.max(4, Math.min(22, 3 + Math.sqrt(custA || nOut) * 2));
+            const etrMs = d.etr && d.etr !== 'ETR-EXP' ? new Date(d.etr).getTime() : NaN;
+            const etrLine = !isNaN(etrMs)
+              ? `Estimated restoration: ${fmtEtr(etrMs)}<br>`
+              : 'Restoration time being reassessed<br>';
+            const popupHtml =
+              `<b>${u.name}</b><br>` +
+              `${nOut > 1 ? fmt(nOut) + ' outages in this area' : '1 outage'} &middot; ${fmt(custA)} customers affected<br>` +
+              etrLine +
+              `<span style="color:#666;font-size:11px">${d.start_time ? 'Started ' + new Date(d.start_time).toLocaleString() : ''}</span>`;
+            features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: coord },
+              properties: { radius, color: '#ef4444', popupHtml } });
+          });
+        } catch (e) { /* individual tile 404s are normal outside a utility's territory */ }
+      }));
+    }));
+
+    const src = map.getSource('kubra-detail');
+    if (src) src.setData({ type: 'FeatureCollection', features });
+  } catch (e) { console.error('Failed to load Kubra detail tiles', e); }
+  finally { kubraDetailInFlight = false; }
+}
+
+function initKubraDetail() {
+  map.addSource('kubra-detail', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'kubra-detail-points', type: 'circle', source: 'kubra-detail',
+    paint: {
+      'circle-radius': ['get', 'radius'], 'circle-color': ['get', 'color'],
+      'circle-opacity': 0.8, 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff'
+    }
+  });
+  bindPopup('kubra-detail-points');
+
+  let moveTimer = null;
+  map.on('moveend', () => {
+    clearTimeout(moveTimer);
+    moveTimer = setTimeout(refreshKubraDetail, 400);
+  });
+}
 
 function bindPopup(layerId) {
   let popup = null;
@@ -495,6 +622,7 @@ function initOutages() {
   initConstruction();
   initTempLabels();
   initRiskLayers();
+  initKubraDetail();
 
   fetch('utilities.json').then(r => r.json()).then(list => {
     UTILITIES = list;
@@ -541,6 +669,7 @@ async function refresh() {
   refreshConstruction();
   refreshTempLabels();
   refreshRiskLayers();
+  refreshKubraDetail();
 }
 
 // ---------- Per-city current temperature ----------
