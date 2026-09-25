@@ -617,9 +617,12 @@ async function refreshKubraDetail() {
   if (kubraDetailInFlight || !UTILITIES.length) return;
   kubraDetailInFlight = true;
   try {
-    const zoom = map.getZoom();
-    const depth = Math.max(5, Math.min(12, Math.round(zoom)));
-    const bounds = map.getBounds();
+    // Locked cities use a fixed bounds + depth covering the whole city, not just
+    // the current viewport — otherwise panning/zooming within the lock would
+    // fetch a different subset of tiles each time and the stat panel's totals
+    // would fluctuate instead of reflecting the full city consistently.
+    const bounds = cityLock ? new maplibregl.LngLatBounds(cityLock.bounds[0], cityLock.bounds[1]) : map.getBounds();
+    const depth = cityLock ? 9 : Math.max(5, Math.min(12, Math.round(map.getZoom())));
     const quadKeys = quadKeysForBounds(bounds, depth);
     if (quadKeys.length > 60) return; // sanity cap; shouldn't happen since depth tracks zoom
 
