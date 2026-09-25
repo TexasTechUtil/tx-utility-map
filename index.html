@@ -4,6 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Texas Power Outages</title>
+<script>
+  // Restores the pretty URL (e.g. /tx-utility-map/dallas) after 404.html's redirect
+  // encoded it as ?/dallas — standard GitHub Pages SPA routing trick, since GH Pages
+  // has no server-side router and would otherwise just 404 on any path but "/".
+  // See: https://github.com/rafgraph/spa-github-pages
+  // Site-relative fetches (utilities.json, etc.) must resolve against this real
+  // base path, not the pretty deep-linked URL below — capture it before rewriting.
+  window.__BASE_PATH__ = window.location.pathname.replace(/[^/]+$/, '');
+  (function (l) {
+    if (l.search[1] === '/') {
+      const decoded = l.search.slice(1).split('&').map(s => s.replace(/~and~/g, '&')).join('?');
+      window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+    }
+  })(window.location);
+</script>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css">
 <style>
   html, body { height: 100%; margin: 0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
@@ -95,45 +110,50 @@
 <div id="panel">
   <h1>Texas Power Outages</h1>
   <div class="sub">Live data from 37 utilities</div>
+  <div id="cityLockNote" style="display:none;font-size:11px;color:#666;margin:-4px 0 8px;">
+    Viewing <span id="cityLockName"></span> &middot; <a href="/tx-utility-map/" style="color:#2563eb;">view full state</a>
+  </div>
   <div id="stats">
     <div class="stat"><div class="n" id="statOutages">&mdash;</div><div class="l">Active outages</div></div>
     <div class="stat"><div class="n" id="statCustomers">&mdash;</div><div class="l">Customers affected</div></div>
   </div>
   <div class="legend-row"><span class="swatch" style="background:#ef4444"></span><span>Individual outages (precise location)</span></div>
   <div class="legend-row"><span class="swatch" style="background:#f59e0b;border-radius:4px"></span><span>Co-ops &mdash; area totals (no exact location published)</span></div>
-  <div class="legend-row"><span class="swatch" style="background:transparent;border:2px dashed #8b5cf6;border-radius:2px"></span><span>El Paso Electric &mdash; no live data, click area for their map</span></div>
-  <div id="weatherToggleRow" class="legend-row">
-    <input type="checkbox" id="weatherToggle" checked>
-    <label for="weatherToggle">Show NWS weather alerts</label>
-  </div>
   <div class="legend-row">
     <input type="checkbox" id="constructionToggle" checked>
     <label for="constructionToggle">Show road construction (Austin, Dallas)</label>
   </div>
-  <div class="legend-row">
-    <input type="checkbox" id="tempToggle" checked>
-    <label for="tempToggle">Show city temperatures</label>
-  </div>
-  <div class="grp-label">Outage risk factors</div>
-  <div class="legend-row">
-    <input type="checkbox" id="wildfireToggle" checked>
-    <label for="wildfireToggle">Wildfire perimeters</label>
-  </div>
-  <div class="legend-row">
-    <input type="checkbox" id="hotspotToggle" checked>
-    <label for="hotspotToggle">Satellite hotspots (24h)</label>
-  </div>
-  <div class="legend-row">
-    <input type="checkbox" id="smokeToggle">
-    <label for="smokeToggle">Smoke forecast</label>
-  </div>
-  <div class="legend-row">
-    <input type="checkbox" id="windToggle" checked>
-    <label for="windToggle">Wind gusts</label>
-  </div>
-  <div class="legend-row">
-    <input type="checkbox" id="gaugeToggle">
-    <label for="gaugeToggle">River/stream gauges</label>
+  <div id="extraFilters">
+    <div class="legend-row"><span class="swatch" style="background:transparent;border:2px dashed #8b5cf6;border-radius:2px"></span><span>El Paso Electric &mdash; no live data, click area for their map</span></div>
+    <div id="weatherToggleRow" class="legend-row">
+      <input type="checkbox" id="weatherToggle" checked>
+      <label for="weatherToggle">Show NWS weather alerts</label>
+    </div>
+    <div class="legend-row">
+      <input type="checkbox" id="tempToggle" checked>
+      <label for="tempToggle">Show city temperatures</label>
+    </div>
+    <div class="grp-label">Outage risk factors</div>
+    <div class="legend-row">
+      <input type="checkbox" id="wildfireToggle" checked>
+      <label for="wildfireToggle">Wildfire perimeters</label>
+    </div>
+    <div class="legend-row">
+      <input type="checkbox" id="hotspotToggle" checked>
+      <label for="hotspotToggle">Satellite hotspots (24h)</label>
+    </div>
+    <div class="legend-row">
+      <input type="checkbox" id="smokeToggle">
+      <label for="smokeToggle">Smoke forecast</label>
+    </div>
+    <div class="legend-row">
+      <input type="checkbox" id="windToggle" checked>
+      <label for="windToggle">Wind gusts</label>
+    </div>
+    <div class="legend-row">
+      <input type="checkbox" id="gaugeToggle">
+      <label for="gaugeToggle">River/stream gauges</label>
+    </div>
   </div>
   <div id="updated">Loading&hellip;</div>
   <button id="refreshBtn">Refresh now</button>
@@ -159,15 +179,82 @@
 
 <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
 <script>
+// ---------- URL deep links, e.g. /tx-utility-map/dallas ----------
+const CITY_PRESETS = {
+  amarillo: [-101.7089, 35.2194], lubbock: [-101.8552, 33.5779], midland: [-102.2019, 31.9425],
+  abilene: [-99.6819, 32.4113], elpaso: [-106.4850, 31.7619], fortworth: [-97.3627, 32.8198],
+  dallas: [-96.7970, 32.8471], dfw: [-97.05, 32.80], tyler: [-95.4022, 32.3541],
+  waco: [-97.2305, 31.6112], austin: [-97.6699, 30.1945], sanantonio: [-98.4704, 29.5337],
+  houston: [-95.2789, 29.6454], corpuschristi: [-97.5122, 27.7704], laredo: [-99.4614, 27.5438],
+  mcallen: [-98.2386, 26.1758]
+};
+const CITY_LABELS = {
+  amarillo: 'Amarillo', lubbock: 'Lubbock', midland: 'Midland', abilene: 'Abilene',
+  elpaso: 'El Paso', fortworth: 'Fort Worth', dallas: 'Dallas', dfw: 'Dallas-Fort Worth',
+  tyler: 'Tyler', waco: 'Waco', austin: 'Austin', sanantonio: 'San Antonio',
+  houston: 'Houston', corpuschristi: 'Corpus Christi', laredo: 'Laredo', mcallen: 'McAllen'
+};
+// Cities with a real locked viewport (can't pan/zoom out to the rest of the state),
+// not just an initial camera position. Add more here as each one gets dialed in —
+// starting with Dallas only per the user's request to perfect one before the rest.
+const CITY_LOCKS = {
+  dallas: { bounds: [[-97.6, 32.3], [-96.3, 33.3]], minZoom: 8 },
+  dfw: { bounds: [[-97.6, 32.3], [-96.3, 33.3]], minZoom: 8 }
+};
+
+// Supports both /tx-utility-map/dallas and /tx-utility-map/dallas/poweroutages —
+// the second segment (view mode) trims the panel down to just outages + construction.
+const POWER_OUTAGES_VIEW_SLUGS = ['poweroutages', 'outages', 'power'];
+function parseDeepLink() {
+  const segs = window.location.pathname.split('/').filter(Boolean);
+  const norm = s => (s || '').toLowerCase().replace(/[^a-z]/g, '');
+  if (segs.length >= 2) {
+    const cityCandidate = norm(segs[segs.length - 2]);
+    if (CITY_PRESETS[cityCandidate]) {
+      return { citySlug: cityCandidate, viewSlug: norm(segs[segs.length - 1]) };
+    }
+  }
+  if (segs.length >= 1) {
+    const cityCandidate = norm(segs[segs.length - 1]);
+    if (CITY_PRESETS[cityCandidate]) return { citySlug: cityCandidate, viewSlug: null };
+  }
+  return { citySlug: null, viewSlug: null };
+}
+const { citySlug: initialCitySlug, viewSlug: initialViewSlug } = parseDeepLink();
+const powerOutagesOnly = POWER_OUTAGES_VIEW_SLUGS.includes(initialViewSlug);
+const cityLock = initialCitySlug ? CITY_LOCKS[initialCitySlug] : null;
+const initialView = initialCitySlug
+  ? { center: CITY_PRESETS[initialCitySlug], zoom: 10 }
+  : { center: [-99.3, 31.3], zoom: 5.7 };
+
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/liberty',
-  center: [-99.3, 31.3],
-  zoom: 5.7,
-  minZoom: 5.4,
-  maxBounds: [[-109.0, 24.0], [-91.0, 38.0]]
+  center: initialView.center,
+  zoom: initialView.zoom,
+  minZoom: cityLock ? cityLock.minZoom : 5.4,
+  maxBounds: cityLock ? cityLock.bounds : [[-109.0, 24.0], [-91.0, 38.0]]
 });
 map.addControl(new maplibregl.NavigationControl(), 'bottom-left');
+
+if (initialCitySlug) {
+  const label = CITY_LABELS[initialCitySlug];
+  document.getElementById('cityLockName').textContent = label;
+  document.getElementById('cityLockNote').style.display = 'block';
+  document.querySelector('#panel h1').textContent = `${label} Power Outages`;
+  document.title = `${label} Power Outages`;
+}
+if (powerOutagesOnly) {
+  // Widget mode — this view gets embedded elsewhere, so strip every bit of
+  // chrome that isn't the map itself, the two stats, and the legend.
+  document.getElementById('extraFilters').style.display = 'none';
+  document.getElementById('aboutBtn').style.display = 'none';
+  document.getElementById('goToRow').style.display = 'none';
+  document.getElementById('cityLockNote').style.display = 'none';
+  document.getElementById('roadPanel').style.display = 'none';
+  document.querySelector('#panel .sub').style.display = 'none';
+  document.querySelector('#panel h1').style.marginBottom = '10px';
+}
 
 // ---------- Go to lat/lng ----------
 let goToMarker = null;
@@ -391,7 +478,7 @@ async function loadCloudCoop(u) {
     return {
       outages, custA,
       feature: { type: 'Feature', geometry: { type: 'Point', coordinates: u.center },
-        properties: { radius, color: severityColor(pct), popupHtml } }
+        properties: { radius, color: severityColor(pct), popupHtml, outages, custA } }
     };
   } catch (e) { console.error('Failed to load', u.name, e); return null; }
 }
@@ -416,7 +503,7 @@ async function loadDataCapable(u) {
         etrLine +
         `<span style="color:#666;font-size:11px">Started ${new Date(ev.startTime).toLocaleString()}</span>`;
       return { type: 'Feature', geometry: { type: 'Point', coordinates: [ev.longitude, ev.latitude] },
-        properties: { radius, color: '#ef4444', popupHtml } };
+        properties: { radius, color: '#ef4444', popupHtml, custA: ev.numPeople || 0 } };
     });
     return { outages: events.length, custA, features };
   } catch (e) { console.error('Failed to load', u.name, e); return null; }
@@ -479,6 +566,38 @@ function kubraTileUrl(qk, level, regionId, dataId) {
 
 const KUBRA_DETAIL_UTILITY_KEYS = ['oncor', 'aep', 'tnmp', 'cps', 'austin', 'pec'];
 let kubraDetailInFlight = false;
+let lastKubraDetailFeatures = [];
+let lastPointFeatures = [];
+let lastAggregateFeatures = [];
+let statewideOutages = 0;
+let statewideCustA = 0;
+
+// In city-locked mode the stat panel should reflect only that city, not the whole
+// state — Kubra detail tiles are already viewport-bounded (maxBounds keeps the map
+// from panning away), but DataCapable points and co-op aggregate markers are fetched
+// statewide, so those two need an explicit in-bounds filter.
+function pointInBounds(coord, b) {
+  return coord[0] >= b[0][0] && coord[0] <= b[1][0] && coord[1] >= b[0][1] && coord[1] <= b[1][1];
+}
+
+function updateStats() {
+  if (!cityLock) {
+    document.getElementById('statOutages').textContent = fmt(statewideOutages);
+    document.getElementById('statCustomers').textContent = fmt(statewideCustA);
+    return;
+  }
+  const b = cityLock.bounds;
+  let outages = 0, custA = 0;
+  lastKubraDetailFeatures.forEach(f => { outages += f.properties.nOut || 1; custA += f.properties.custA || 0; });
+  lastPointFeatures.forEach(f => {
+    if (pointInBounds(f.geometry.coordinates, b)) { outages += 1; custA += f.properties.custA || 0; }
+  });
+  lastAggregateFeatures.forEach(f => {
+    if (pointInBounds(f.geometry.coordinates, b)) { outages += f.properties.outages || 0; custA += f.properties.custA || 0; }
+  });
+  document.getElementById('statOutages').textContent = fmt(outages);
+  document.getElementById('statCustomers').textContent = fmt(custA);
+}
 
 async function refreshKubraDetail() {
   if (kubraDetailInFlight || !UTILITIES.length) return;
@@ -520,7 +639,7 @@ async function refreshKubraDetail() {
               etrLine +
               `<span style="color:#666;font-size:11px">${d.start_time ? 'Started ' + new Date(d.start_time).toLocaleString() : ''}</span>`;
             features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: coord },
-              properties: { radius, color: '#ef4444', popupHtml } });
+              properties: { radius, color: '#ef4444', popupHtml, custA, nOut } });
           });
         } catch (e) { /* individual tile 404s are normal outside a utility's territory */ }
       }));
@@ -528,6 +647,8 @@ async function refreshKubraDetail() {
 
     const src = map.getSource('kubra-detail');
     if (src) src.setData({ type: 'FeatureCollection', features });
+    lastKubraDetailFeatures = features;
+    updateStats();
   } catch (e) { console.error('Failed to load Kubra detail tiles', e); }
   finally { kubraDetailInFlight = false; }
 }
@@ -617,14 +738,18 @@ function initOutages() {
   });
   bindPopup('outage-aggregates');
 
-  initWeatherAlerts();
-  initElPasoOutline();
+  // In power-outages-only mode, skip loading (and fetching) anything beyond outages
+  // and construction — no point paying for requests to data that's never shown.
+  if (!powerOutagesOnly) {
+    initWeatherAlerts();
+    initElPasoOutline();
+    initTempLabels();
+    initRiskLayers();
+  }
   initConstruction();
-  initTempLabels();
-  initRiskLayers();
   initKubraDetail();
 
-  fetch('utilities.json').then(r => r.json()).then(list => {
+  fetch(window.__BASE_PATH__ + 'utilities.json').then(r => r.json()).then(list => {
     UTILITIES = list;
     document.getElementById('panel').querySelector('.sub').textContent = `Live data from ${list.length} utilities`;
     renderAboutPanel(list);
@@ -642,8 +767,8 @@ async function refresh() {
   const results = await Promise.all(UTILITIES.map(u => loaders[u.kind](u)));
 
   const ok = results.filter(Boolean);
-  const totalOutages = ok.reduce((s, r) => s + r.outages, 0);
-  const totalCustA = ok.reduce((s, r) => s + r.custA, 0);
+  statewideOutages = ok.reduce((s, r) => s + r.outages, 0);
+  statewideCustA = ok.reduce((s, r) => s + r.custA, 0);
 
   const pointFeatures = [];
   const aggregateFeatures = [];
@@ -651,13 +776,14 @@ async function refresh() {
     if (r.features) pointFeatures.push(...r.features);
     else if (r.feature) aggregateFeatures.push(r.feature);
   });
+  lastPointFeatures = pointFeatures;
+  lastAggregateFeatures = aggregateFeatures;
   const pointSrc = map.getSource('outage-points');
   if (pointSrc) pointSrc.setData({ type: 'FeatureCollection', features: pointFeatures });
   const aggSrc = map.getSource('outage-aggregates');
   if (aggSrc) aggSrc.setData({ type: 'FeatureCollection', features: aggregateFeatures });
 
-  document.getElementById('statOutages').textContent = fmt(totalOutages);
-  document.getElementById('statCustomers').textContent = fmt(totalCustA);
+  updateStats();
 
   const failedCount = results.length - ok.length;
   document.getElementById('updated').textContent =
@@ -665,10 +791,12 @@ async function refresh() {
     (failedCount ? ` (${failedCount} of ${results.length} sources unavailable)` : '') +
     ' · refreshes every 5 min';
 
-  refreshWeatherAlerts();
+  if (!powerOutagesOnly) {
+    refreshWeatherAlerts();
+    refreshTempLabels();
+    refreshRiskLayers();
+  }
   refreshConstruction();
-  refreshTempLabels();
-  refreshRiskLayers();
   refreshKubraDetail();
 }
 
@@ -909,7 +1037,7 @@ function initWeatherAlerts() {
 
 // ---------- El Paso Electric (reference outline only — no live data, see El Paso Electric note) ----------
 function initElPasoOutline() {
-  fetch('epelectric-territory.geojson').then(r => r.json()).then(data => {
+  fetch(window.__BASE_PATH__ + 'epelectric-territory.geojson').then(r => r.json()).then(data => {
     map.addSource('epelectric', { type: 'geojson', data });
     map.addLayer({
       id: 'epelectric-fill', type: 'fill', source: 'epelectric',
