@@ -183,26 +183,64 @@
 <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
 <script>
 // ---------- URL deep links, e.g. /tx-utility-map/dallas ----------
+// Centers verified against OpenStreetMap/Nominatim geocoding (city-level results,
+// double-checked against county-name collisions — e.g. "Yoakum, TX" naively geocodes
+// to Yoakum County near the NM border, ~500km from the actual town near Gonzales).
 const CITY_PRESETS = {
-  amarillo: [-101.7089, 35.2194], lubbock: [-101.8552, 33.5779], midland: [-102.2019, 31.9425],
-  abilene: [-99.6819, 32.4113], elpaso: [-106.4850, 31.7619], fortworth: [-97.3627, 32.8198],
-  dallas: [-96.7970, 32.8471], dfw: [-97.05, 32.80], tyler: [-95.4022, 32.3541],
-  waco: [-97.2305, 31.6112], austin: [-97.6699, 30.1945], sanantonio: [-98.4704, 29.5337],
-  houston: [-95.2789, 29.6454], corpuschristi: [-97.5122, 27.7704], laredo: [-99.4614, 27.5438],
-  mcallen: [-98.2386, 26.1758]
+  amarillo: [-101.8371, 35.2073], lubbock: [-101.8470, 33.5856], midland: [-102.2019, 31.9425],
+  abilene: [-99.7476, 32.4465], elpaso: [-106.4870, 31.7601], fortworth: [-97.3327, 32.7532],
+  dallas: [-96.7970, 32.8471], dfw: [-97.05, 32.80], tyler: [-95.3011, 32.3513],
+  waco: [-97.1326, 31.5545], austin: [-97.7437, 30.2711], sanantonio: [-98.4951, 29.4246],
+  houston: [-95.3677, 29.7589], corpuschristi: [-97.4033, 27.7635], laredo: [-99.5070, 27.5079],
+  mcallen: [-98.2386, 26.1758],
+  atlanta: [-94.1663, 33.1162], beaumont: [-94.0984, 30.0829], brownwood: [-98.9819, 31.7209],
+  bryan: [-96.3700, 30.6744], childress: [-100.2043, 34.4265], lufkin: [-94.7289, 31.3386],
+  odessa: [-102.3677, 31.8457], paris: [-95.5555, 33.6618], sanangelo: [-100.4405, 31.4650],
+  wichitafalls: [-98.5021, 33.9005], yoakum: [-97.1493, 29.2894]
 };
 const CITY_LABELS = {
   amarillo: 'Amarillo', lubbock: 'Lubbock', midland: 'Midland', abilene: 'Abilene',
   elpaso: 'El Paso', fortworth: 'Fort Worth', dallas: 'Dallas', dfw: 'Dallas-Fort Worth',
   tyler: 'Tyler', waco: 'Waco', austin: 'Austin', sanantonio: 'San Antonio',
-  houston: 'Houston', corpuschristi: 'Corpus Christi', laredo: 'Laredo', mcallen: 'McAllen'
+  houston: 'Houston', corpuschristi: 'Corpus Christi', laredo: 'Laredo', mcallen: 'McAllen',
+  atlanta: 'Atlanta', beaumont: 'Beaumont', brownwood: 'Brownwood', bryan: 'Bryan-College Station',
+  childress: 'Childress', lufkin: 'Lufkin', odessa: 'Odessa', paris: 'Paris',
+  sanangelo: 'San Angelo', wichitafalls: 'Wichita Falls', yoakum: 'Yoakum'
 };
 // Cities with a real locked viewport (can't pan/zoom out to the rest of the state),
-// not just an initial camera position. Add more here as each one gets dialed in —
-// starting with Dallas only per the user's request to perfect one before the rest.
+// not just an initial camera position. Box size (and therefore minZoom) is tiered
+// by metro size: large metros get a wider box at a lower minZoom, small towns get a
+// tight box at a higher minZoom so the locked view doesn't show mostly empty land.
 const CITY_LOCKS = {
   dallas: { bounds: [[-97.6, 32.3], [-96.3, 33.3]], minZoom: 8 },
-  dfw: { bounds: [[-97.6, 32.3], [-96.3, 33.3]], minZoom: 8 }
+  dfw: { bounds: [[-97.6, 32.3], [-96.3, 33.3]], minZoom: 8 },
+  // Tier A — major metros
+  houston: { bounds: [[-96.2177, 29.1089], [-94.5177, 30.4089]], minZoom: 8 },
+  sanantonio: { bounds: [[-99.1451, 28.8746], [-97.8451, 29.9746]], minZoom: 8 },
+  austin: { bounds: [[-98.3937, 29.7211], [-97.0937, 30.8211]], minZoom: 8 },
+  fortworth: { bounds: [[-97.9827, 32.2032], [-96.6827, 33.3032]], minZoom: 8 },
+  elpaso: { bounds: [[-107.1370, 31.2101], [-105.8370, 32.3101]], minZoom: 8 },
+  // Tier B — mid-size metros
+  amarillo: { bounds: [[-102.2371, 34.8573], [-101.4371, 35.5573]], minZoom: 9 },
+  lubbock: { bounds: [[-102.2470, 33.2356], [-101.4470, 33.9356]], minZoom: 9 },
+  abilene: { bounds: [[-100.1476, 32.0965], [-99.3476, 32.7965]], minZoom: 9 },
+  waco: { bounds: [[-97.5326, 31.2045], [-96.7326, 31.9045]], minZoom: 9 },
+  corpuschristi: { bounds: [[-97.8033, 27.4135], [-97.0033, 28.1135]], minZoom: 9 },
+  laredo: { bounds: [[-99.9070, 27.1579], [-99.1070, 27.8579]], minZoom: 9 },
+  beaumont: { bounds: [[-94.4984, 29.7329], [-93.6984, 30.4329]], minZoom: 9 },
+  // Tier C — smaller metros
+  tyler: { bounds: [[-95.6511, 32.0513], [-94.9511, 32.6513]], minZoom: 9 },
+  bryan: { bounds: [[-96.7200, 30.3744], [-96.0200, 30.9744]], minZoom: 9 },
+  odessa: { bounds: [[-102.7177, 31.5457], [-102.0177, 32.1457]], minZoom: 9 },
+  sanangelo: { bounds: [[-100.7905, 31.1650], [-100.0905, 31.7650]], minZoom: 9 },
+  wichitafalls: { bounds: [[-98.8521, 33.6005], [-98.1521, 34.2005]], minZoom: 9 },
+  // Tier D — small towns
+  atlanta: { bounds: [[-94.4163, 32.8962], [-93.9163, 33.3362]], minZoom: 10 },
+  brownwood: { bounds: [[-99.2319, 31.5009], [-98.7319, 31.9409]], minZoom: 10 },
+  childress: { bounds: [[-100.4543, 34.2065], [-99.9543, 34.6465]], minZoom: 10 },
+  lufkin: { bounds: [[-94.9789, 31.1186], [-94.4789, 31.5586]], minZoom: 10 },
+  paris: { bounds: [[-95.8055, 33.4418], [-95.3055, 33.8818]], minZoom: 10 },
+  yoakum: { bounds: [[-97.3993, 29.0694], [-96.8993, 29.5094]], minZoom: 10 }
 };
 
 // Supports both /tx-utility-map/dallas and /tx-utility-map/dallas/poweroutages —
