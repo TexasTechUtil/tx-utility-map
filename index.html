@@ -681,6 +681,13 @@ async function refreshKubraDetail() {
           (tile.file_data || []).forEach(f => {
             if (!f.geom || !f.geom.p || !f.geom.p[0]) return;
             const coord = decodeKubraPoint(f.geom.p[0]);
+            // The quadkey grid doesn't align to an arbitrary bounds rectangle — a
+            // tile can be pulled in because it touches the box while the actual
+            // point it contains sits well outside it (e.g. a tile overlapping
+            // Waco's southern edge can hold a point down near Temple). Drop those
+            // so neither the map nor the stat panel shows/counts outages that are
+            // nowhere near the locked city.
+            if (!bounds.contains(coord)) return;
             const d = f.desc || {};
             const nOut = d.n_out || 1;
             const custA = d.cust_a ? d.cust_a.val : 0;
