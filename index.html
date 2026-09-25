@@ -38,6 +38,12 @@
   .legend-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
   .swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,0.3); }
   #updated { color: #666; font-size: 11px; margin-top: 8px; }
+  .dropdown-bar {
+    width: 100%; text-align: left; padding: 4px 2px; margin: -2px 0 4px; font-size: 11px;
+    color: #2563eb; background: none; border: none; border-top: 1px solid #eee;
+    cursor: pointer; padding-top: 6px;
+  }
+  #widgetDetails.collapsed { display: none; }
   #refreshBtn {
     margin-top: 6px; width: 100%; padding: 5px; font-size: 12px; cursor: pointer;
     border: 1px solid #ccc; border-radius: 4px; background: #fff;
@@ -117,6 +123,8 @@
     <div class="stat"><div class="n" id="statOutages">&mdash;</div><div class="l">Active outages</div></div>
     <div class="stat"><div class="n" id="statCustomers">&mdash;</div><div class="l">Customers affected</div></div>
   </div>
+  <button id="widgetToggle" class="dropdown-bar" style="display:none;">Details &#9662;</button>
+  <div id="widgetDetails">
   <div class="legend-row"><span class="swatch" style="background:#ef4444"></span><span>Individual outages (precise location)</span></div>
   <div class="legend-row"><span class="swatch" style="background:#f59e0b;border-radius:4px"></span><span>Co-ops &mdash; area totals (no exact location published)</span></div>
   <div class="legend-row">
@@ -157,6 +165,7 @@
   </div>
   <div id="updated">Loading&hellip;</div>
   <button id="refreshBtn">Refresh now</button>
+  </div>
   <div id="goToRow">
     <input type="text" id="goToInput" placeholder="lat, lng (e.g. 30.27, -97.74)">
     <button id="goToBtn">Go</button>
@@ -246,7 +255,9 @@ if (initialCitySlug) {
 }
 if (powerOutagesOnly) {
   // Widget mode — this view gets embedded elsewhere, so strip every bit of
-  // chrome that isn't the map itself, the two stats, and the legend.
+  // chrome that isn't the map itself and the two headline stats. Everything
+  // else (legend, construction toggle, refresh button) sits behind a
+  // collapsed dropdown so the map gets as much room as possible by default.
   document.getElementById('extraFilters').style.display = 'none';
   document.getElementById('aboutBtn').style.display = 'none';
   document.getElementById('goToRow').style.display = 'none';
@@ -254,6 +265,15 @@ if (powerOutagesOnly) {
   document.getElementById('roadPanel').style.display = 'none';
   document.querySelector('#panel .sub').style.display = 'none';
   document.querySelector('#panel h1').style.marginBottom = '10px';
+
+  const widgetDetails = document.getElementById('widgetDetails');
+  const widgetToggle = document.getElementById('widgetToggle');
+  widgetDetails.classList.add('collapsed');
+  widgetToggle.style.display = 'block';
+  widgetToggle.addEventListener('click', () => {
+    const open = widgetDetails.classList.toggle('collapsed') === false;
+    widgetToggle.innerHTML = open ? 'Details &#9652;' : 'Details &#9662;';
+  });
 }
 
 // ---------- Go to lat/lng ----------
