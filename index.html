@@ -304,7 +304,6 @@ if (powerOutagesOnly) {
   // else (legend, construction toggle, refresh button) sits behind a
   // collapsed dropdown so the map gets as much room as possible by default.
   document.getElementById('extraFilters').style.display = 'none';
-  document.getElementById('aboutBtn').style.display = 'none';
   document.getElementById('goToRow').style.display = 'none';
   document.getElementById('cityLockNote').style.display = 'none';
   document.getElementById('roadPanel').style.display = 'none';
@@ -349,7 +348,44 @@ const aboutBtn = document.getElementById('aboutBtn');
 const aboutPanel = document.getElementById('aboutPanel');
 aboutBtn.addEventListener('click', () => aboutPanel.classList.toggle('open'));
 
+// For a locked city, "which utilities serve this area" isn't something we have real
+// territory polygons for, so it's derived from two signals: (1) a utility whose
+// declared center point falls inside the box — catches small/local co-ops correctly —
+// union (2) any utility that has actually put a feature inside the box, this session
+// or a past visit (tagged with utilityName when each feature is built, remembered in
+// localStorage per city so a quiet moment for a utility doesn't drop it from the list —
+// e.g. Oncor's own center sits outside Waco's box, so it only shows up there once an
+// Oncor outage has actually been observed inside Waco's bounds at least once).
+function getCityUtilities() {
+  if (!cityLock || !UTILITIES.length) return UTILITIES;
+  const b = new maplibregl.LngLatBounds(cityLock.bounds[0], cityLock.bounds[1]);
+  const storageKey = 'seenUtilities:' + initialCitySlug;
+  let seen = [];
+  try { seen = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch (e) {}
+  const relevant = new Set(seen);
+  UTILITIES.forEach(u => { if (u.center && b.contains(u.center)) relevant.add(u.name); });
+  [lastKubraDetailFeatures, lastPointFeatures, lastAggregateFeatures].forEach(arr => {
+    arr.forEach(f => {
+      if (f.properties.utilityName && b.contains(f.geometry.coordinates)) relevant.add(f.properties.utilityName);
+    });
+  });
+  try { localStorage.setItem(storageKey, JSON.stringify([...relevant])); } catch (e) {}
+  return UTILITIES.filter(u => relevant.has(u.name));
+}
+
 function renderAboutPanel(utilities) {
+  const heading = document.querySelector('#aboutPanel .hd b');
+  const desc = document.querySelector('#aboutPanel .hd .desc');
+  if (cityLock) {
+    heading.textContent = `${CITY_LABELS[initialCitySlug]} data sources`;
+    desc.textContent = utilities.length
+      ? `${utilities.length} utilit${utilities.length === 1 ? 'y' : 'ies'} reporting data for this area. Click a name to open its live outage map.`
+      : 'No live-data utility currently reporting for this area.';
+  } else {
+    heading.textContent = 'Data sources';
+    desc.textContent = `${utilities.length} Texas utilities. Click a name to open its live outage map in a new tab.`;
+  }
+
   const groups = [
     { label: 'Individual outages + restoration time', kinds: ['datacapable', 'kubra'] },
     { label: 'Area-total outage counts only', kinds: ['cloudcoop'] }
@@ -543,7 +579,7 @@ async function loadCloudCoop(u) {
     return {
       outages, custA,
       feature: { type: 'Feature', geometry: { type: 'Point', coordinates: u.center },
-        properties: { radius, color: severityColor(pct), popupHtml, outages, custA } }
+        properties: { radius, color: severityColor(pct), popupHtml, outages, custA, utilityName: u.name } }
     };
   } catch (e) { console.error('Failed to load', u.name, e); return null; }
 }
@@ -568,7 +604,7 @@ async function loadDataCapable(u) {
         etrLine +
         `<span style="color:#666;font-size:11px">Started ${new Date(ev.startTime).toLocaleString()}</span>`;
       return { type: 'Feature', geometry: { type: 'Point', coordinates: [ev.longitude, ev.latitude] },
-        properties: { radius, color: '#ef4444', popupHtml, custA: ev.numPeople || 0 } };
+        properties: { radius, color: '#ef4444', popupHtml, custA: ev.numPeople || 0, utilityName: u.name } };
     });
     return { outages: events.length, custA, features };
   } catch (e) { console.error('Failed to load', u.name, e); return null; }
@@ -714,7 +750,7 @@ async function refreshKubraDetail() {
               etrLine +
               `<span style="color:#666;font-size:11px">${d.start_time ? 'Started ' + new Date(d.start_time).toLocaleString() : ''}</span>`;
             features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: coord },
-              properties: { radius, color: '#ef4444', popupHtml, custA, nOut } });
+              properties: { radius, color: '#ef4444', popupHtml, custA, nOut, utilityName: u.name } });
           });
         } catch (e) { /* individual tile 404s are normal outside a utility's territory */ }
       }));
@@ -724,6 +760,7 @@ async function refreshKubraDetail() {
     if (src) src.setData({ type: 'FeatureCollection', features });
     lastKubraDetailFeatures = features;
     updateStats();
+    if (cityLock) renderAboutPanel(getCityUtilities());
   } catch (e) { console.error('Failed to load Kubra detail tiles', e); }
   finally { kubraDetailInFlight = false; }
 }
@@ -827,7 +864,7 @@ function initOutages() {
   fetch(window.__BASE_PATH__ + 'utilities.json').then(r => r.json()).then(list => {
     UTILITIES = list;
     document.getElementById('panel').querySelector('.sub').textContent = `Live data from ${list.length} utilities`;
-    renderAboutPanel(list);
+    renderAboutPanel(getCityUtilities());
     refresh();
     setInterval(refresh, 5 * 60 * 1000);
   });
@@ -857,6 +894,7 @@ async function refresh() {
   if (aggSrc) aggSrc.setData({ type: 'FeatureCollection', features: aggregateFeatures });
 
   updateStats();
+  if (cityLock) renderAboutPanel(getCityUtilities());
 
   const failedCount = results.length - ok.length;
   document.getElementById('updated').textContent =
