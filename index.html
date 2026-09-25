@@ -44,11 +44,6 @@
     cursor: pointer; padding-top: 6px;
   }
   #widgetDetails.collapsed { display: none; }
-  #refreshBtn {
-    margin-top: 6px; width: 100%; padding: 5px; font-size: 12px; cursor: pointer;
-    border: 1px solid #ccc; border-radius: 4px; background: #fff;
-  }
-  #refreshBtn:hover { background: #f3f4f6; }
   #weatherToggleRow { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; }
   .grp-label { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: .03em; }
 
@@ -128,7 +123,7 @@
   <div class="legend-row"><span class="swatch" style="background:#ef4444"></span><span>Individual outages (precise location)</span></div>
   <div class="legend-row"><span class="swatch" style="background:#f59e0b;border-radius:4px"></span><span>Co-ops &mdash; area totals (no exact location published)</span></div>
   <div class="legend-row">
-    <input type="checkbox" id="constructionToggle" checked>
+    <input type="checkbox" id="constructionToggle">
     <label for="constructionToggle">Show road construction (Austin, Dallas)</label>
   </div>
   <div id="extraFilters">
@@ -164,7 +159,6 @@
     </div>
   </div>
   <div id="updated">Loading&hellip;</div>
-  <button id="refreshBtn">Refresh now</button>
   </div>
   <div id="goToRow">
     <input type="text" id="goToInput" placeholder="lat, lng (e.g. 30.27, -97.74)">
@@ -778,8 +772,6 @@ function initOutages() {
   });
 }
 
-document.getElementById('refreshBtn').addEventListener('click', refresh);
-
 async function refresh() {
   document.getElementById('updated').textContent = 'Refreshing…';
 
@@ -955,7 +947,7 @@ function initConstruction() {
   map.addLayer({
     id: 'construction-lines', type: 'line', source: 'construction-lines-src',
     paint: { 'line-color': CONSTRUCTION_COLOR, 'line-width': 4, 'line-opacity': 0.85 },
-    layout: { 'line-cap': 'round' }
+    layout: { 'line-cap': 'round', visibility: 'none' }
   });
 
   map.addSource('construction-points-src', {
@@ -965,6 +957,7 @@ function initConstruction() {
   map.addLayer({
     id: 'construction-clusters', type: 'circle', source: 'construction-points-src',
     filter: ['has', 'point_count'],
+    layout: { visibility: 'none' },
     paint: {
       'circle-color': CONSTRUCTION_COLOR, 'circle-opacity': 0.75,
       'circle-radius': ['step', ['get', 'point_count'], 12, 10, 18, 100, 24, 1000, 32],
@@ -974,12 +967,13 @@ function initConstruction() {
   map.addLayer({
     id: 'construction-cluster-count', type: 'symbol', source: 'construction-points-src',
     filter: ['has', 'point_count'],
-    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 11 },
+    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 11, visibility: 'none' },
     paint: { 'text-color': '#fff' }
   });
   map.addLayer({
     id: 'construction-points', type: 'circle', source: 'construction-points-src',
     filter: ['!', ['has', 'point_count']],
+    layout: { visibility: 'none' },
     paint: {
       'circle-radius': 4, 'circle-color': CONSTRUCTION_COLOR, 'circle-opacity': 0.8,
       'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff'
