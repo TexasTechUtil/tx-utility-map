@@ -118,6 +118,11 @@
     <div class="stat"><div class="n" id="statOutages">&mdash;</div><div class="l">Active outages</div></div>
     <div class="stat"><div class="n" id="statCustomers">&mdash;</div><div class="l">Customers affected</div></div>
   </div>
+  <a id="noDataNote" href="https://outagemap.epelectric.com/" target="_blank" rel="noopener"
+     style="display:none;font-size:12px;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;margin:0 0 10px;text-decoration:none;">
+    No live outage feed for El Paso Electric &mdash; not a zero-outage reading, just no data source.
+    <b style="white-space:nowrap;">Open EPE's own map &rarr;</b>
+  </a>
   <button id="widgetToggle" class="dropdown-bar" style="display:none;">Details &#9662;</button>
   <div id="widgetDetails">
   <div class="legend-row"><span class="swatch" style="background:#ef4444"></span><span>Individual outages (precise location)</span></div>
@@ -285,6 +290,13 @@ if (initialCitySlug) {
   document.getElementById('cityLockNote').style.display = 'block';
   document.querySelector('#panel h1').textContent = `${label} Power Outages`;
   document.title = `${label} Power Outages`;
+}
+// El Paso Electric has no live outage feed we can use (their API is client-side
+// encrypted, same access-control situation we won't work around) — show that
+// plainly instead of a "0 outages" reading that would look like a false all-clear.
+if (initialCitySlug === 'elpaso') {
+  document.getElementById('stats').style.display = 'none';
+  document.getElementById('noDataNote').style.display = 'block';
 }
 if (powerOutagesOnly) {
   // Widget mode — this view gets embedded elsewhere, so strip every bit of
